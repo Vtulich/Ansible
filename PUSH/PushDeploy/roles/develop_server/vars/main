@@ -1,0 +1,47 @@
+### Переменная для папки с бекапами ###
+var_datetime: "{{ lookup('pipe','date +%d%m%Y') }}"
+
+### Для расшаривания папки, где будут лежать Заглушка, Сендер и Сервис ###
+path_push: "C:\\Push"
+
+### Путь до папки с Portal ###
+path_portal: "C:\\Push\\Portal"
+
+### Путь до папки с файлами Service ###
+path_service: "C:\\Push\\Server"
+
+### Путь до папки с заглушкой ###
+path_stub_single: "C:\\Push\\LoadTesting\\Stubs"
+
+### Путь до папкси с Sender ###
+path_sender: "C:\\Push\\LoadTesting\\Sender"
+
+### Путь до собранного Portal проекта из сырков ###
+path_projectportal: "C:\\{{ branch }}\\*.MessageService.Web\\*.MessageService.Web.Portal\\bin\\x64\\Release"
+
+### Путь до собранного Service проекта из сырков ###
+path_projectservice: "C:\\{{ branch }}\\*.MessageService.Push\\*.MessageService.Push.Service\\bin\\x64\\Release"
+
+### Путь до собранной заглушки ###
+path_stub_build: "C:\\{{ branch }}\\*.MessageService.Load.Stubs\\bin\\x64\\Release"
+
+### Путь до собранного Sender ###
+path_sender_build: "C:\\{{ branch }}\\*.MessageService.Load\\*.MessageService.Load.Sender\\bin\\x64\\Release"
+
+### Путь до AppVersion.cs в которой находится нужная нам версия ###
+path_common_version: "C:\\{{ branch }}\\*.MessageService.Common\\AppVersion.cs"
+
+### Путь до *.MessageService.Common.Web.csproj в которой находится нужная нам версия ###
+path_web_version: "C:\\{{ branch }}\\*.MessageService.Common.Web\\*.MessageService.Common.Web.csproj"
+
+### Путь до *.MessageService.Launcher.csproj в которой находится нужная нам версия ###
+path_launcher_version: "C:\\{{ branch }}\\*.MessageService.Launcher\\*.MessageService.Launcher.csproj"
+
+### Пароли dev сред ###
+jenkins_password: !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          61356563643330313038393336636530313463323232386433316338613934313163613831643731
+          3231613334653565316336633965626532636565356132350a373166643735643134323139633830
+          36646363653162653334313262643966323135656637663032303533656333336536636161353530
+          3839363436393263300a363265316363396135633934376232653636366435306439343237366433
+          38356536386232623832356136623163373766336631343235383765376333356436

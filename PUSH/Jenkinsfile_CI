@@ -1,0 +1,75 @@
+pipeline {
+    agent { label 'slave-push' }
+    parameters {
+        gitParameter branchFilter: 'origin/(.*)', defaultValue: 'master', name: 'BranchGit', type: 'PT_BRANCH_TAG', sortMode: 'ASCENDING', useRepository: 'ssh://git@stash.dev.itc.DOMENNAME.ru:7999/push/server.git',
+        description: 'Choose a brunch from which AUTODEPLOY PUSH'
+    }
+    
+    options {
+        ansiColor('xterm')
+        skipStagesAfterUnstable()
+    }
+    
+    stages {
+
+        stage ('check changes repository') {
+            steps {
+                checkout([$class: 'GitSCM', branches: [[name: "${params.BranchGit}"]], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'PUSH']], submoduleCfg: [], userRemoteConfigs: [[credentialsId: 'ef4442ab-0431-45c5-af5a-6e791ce53440', url: 'ssh://git@stash.dev.itc.DOMENNAME.ru:7999/push/server.git']]])
+            }
+        }
+
+        stage ('Rewrite Build Name') {
+            steps {
+                script {
+                    currentBuild.displayName = "${BranchGit}.${currentBuild.number}"
+                }
+            }
+        }
+
+        stage ('run unit test&coverage') {
+            environment {
+                LastCommit = """${sh(returnStdout:true, script: 'cd ${WORKSPACE}/PUSH&&git log -1 --stat')}"""
+                        }
+            steps {
+                script {
+                    try {
+                        sh 'dotnet test --settings ${WORKSPACE}/PUSH/*/coverlet.runsettings /p:CollectCoverage=true ${WORKSPACE}/PUSH/'
+                        cobertura coberturaReportFile: '**/TestResults/*/coverage.cobertura.xml', autoUpdateHealth: false, autoUpdateStability: false, failUnhealthy: false, failUnstable: false, maxNumberOfBuilds: 30, onlyStable: false, failNoReports: false
+                    }
+                    catch (ex) {
+                        unstable('FAILED UNIT TESTS')
+                        mail (to: 'Dmitriy.Vtulkin@DOMENNAME.ru,Vladimir.Avdiev@DOMENNAME.ru,Maksim.Shulapov@DOMENNAME.ru,Igor.Zlatomrezhev@DOMENNAME.ru', subject: "UNIT TEST FAILED ${BranchGit}.${currentBuild.number}", body: "URL сборки, в которой зафеилился unit тест(ы) - ${BUILD_URL}console \n\n Автор коммита и последний коммит: \n ${env.LastCommit}");
+                    }
+                }
+            }
+        }
+
+        stage ('SonarQube check code') {
+            steps {
+                script {
+                    try {
+                        tool name: 'sonar-4', type: 'hudson.plugins.sonar.SonarRunnerInstallation';
+                        withSonarQubeEnv('sonar') {
+                        sh "export SONAR_SCANNER_OPTS=-Djavax.net.ssl.trustStore=${JAVA_HOME}/lib/security/cacerts && export NODE_PATH=/usr/lib/node_modules && export FrameworkPathOverride=/lib/mono/ && /opt/sonar-scanner/bin/sonar-scanner -Dsonar.cs.opencover.reportsPaths=${WORKSPACE}/**/TestResults/**/coverage.opencover.xml -Dsonar.branch.name=${BranchGit} -Dsonar.projectBaseDir=${WORKSPACE}/PUSH -Dsonar.exclusions=**/Contrib/**,**/Emulator/**,**/*.MessageService.Common/**.**/Tests,*.MessageService.Load/**,**/*.MessageService.Load.Stubs/**,**/*.MessageService.Scripts/**,**/*.MessageService.SqlScripts/**,**/*.MessageService.Tests/**,**/*.MessageService.Utils/**,**/*.MessageService.Web.Tests/**,**/PushMessageWS1/**,**/Tests/*.MessageService.Benchmarks,**/Конфиги/**,**/*.MessageService.Transport.Push.Apns/**,**/*.MessageService.Transport.Push.Gcm/**,**/*.MessageService.Transport.Sms/**,**/*.MessageService.Transport.Viber/**,**/*.MessageService.Db/** -Dsonar.scm.provider=git -Dsonar.host.url=https://sonar.DOMENNAME.ru -Dsonar.projectKey=push-server"
+                }
+            }
+                    catch (ex) {
+                        unstable('FAILED SonarQube')
+                        emailext body: 'UNIT тесты успешны. \n Отчет Coverage - ${BUILD_URL}cobertura. \n URL сборки, в которой зафеилился SonarQube - ${BUILD_URL}console', subject: 'SonarQube FAILED ${BranchGit}.${currentBuild.number}', to: 'Dmitriy.Vtulkin@DOMENNAME.ru,Vladimir.Avdiev@DOMENNAME.ru,Maksim.Shulapov@DOMENNAME.ru,Igor.Zlatomrezhev@DOMENNAME.ru'
+                }
+            }
+        }
+    }
+
+        stage ('delete project end') {
+            steps {
+                sh 'rm -rf ${WORKSPACE}/*'
+            }
+        }
+    }
+        post {
+            success {
+                emailext body: 'URL успешного CI - ${BUILD_URL}console, \n отчет Coverage - ${BUILD_URL}cobertura, \n отчет SonarQube(не забываем выбрать ветку) - https://sonar.DOMENNAME.ru/dashboard?id=push-server', subject: 'SUCCESS CI ${BranchGit}.${BUILD_NUMBER}', to: 'Dmitriy.Vtulkin@DOMENNAME.ru,Vladimir.Avdiev@DOMENNAME.ru,Maksim.Shulapov@DOMENNAME.ru,Igor.Zlatomrezhev@DOMENNAME.ru'
+                }
+            }
+}

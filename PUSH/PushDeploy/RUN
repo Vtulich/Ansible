@@ -1,0 +1,5 @@
+- hosts: buildnode
+  gather_facts: no
+
+  roles:
+    - "{{ run_roles }}"

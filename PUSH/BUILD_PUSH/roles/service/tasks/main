@@ -1,0 +1,17 @@
+  - name: Создаем директорию, куда будем деплоить наш проект Service
+    win_file:
+      path: C:\Push\Server
+      state: directory
+
+  - name: Пилим дырки в FW
+    win_firewall_rule:
+      name: "{{ item.rulename }}"
+      localport: "{{ item.ruleport }}"
+      action: allow
+      direction: in
+      protocol: tcp
+      state: present
+      enabled: yes
+    loop:
+      - { rulename: 'LauncherHTTP(NOT DELETE)', ruleport: '9090' }
+      - { rulename: 'LauncherHTTPS(NOT DELETE)', ruleport: '9091' }

@@ -1,0 +1,379 @@
+- name: отключить проверку сертификата
+  win_command: "git config --global http.sslVerify false"
+
+- name: Выкачка репозитория. win_git - не официальный модуль, https://github.com/tivrobo/ansible-win_git
+  win_git:
+    ### Если в access token присутствует "/", его необходимо заменить на "%2F" ###
+    repo: "https://CICD:PASSWORD@stash.dev.itc.DOMAINNAME.ru/scm/push/server.git"
+    dest: "C:\\{{ branch }}"
+    branch: "{{ branch }}"
+    update: yes
+    recursive: yes
+    replace_dest: yes
+    accept_hostkey: yes
+
+- name: Nuget Update
+  win_command: 'C:\\nuget\\nuget.exe restore C:\\{{ branch }}\\*.MessageService.sln -msbuildpath "C:\\Program Files (x86)\\BuildTools\\MSBuild\\Current\\Bin"'
+
+- name: Ищем версию AppVersion.cs в *.MessageService.Common
+  win_shell: |
+    Get-ChildItem -Path "{{ path_common_version }}" -recurse | Get-Content | Select-String -Pattern "public const string String" | ForEach-Object {$_ -replace """;"}
+  register: OutputVersionCommon
+
+- name: Добавляем номер билда в AppVersion.cs
+  win_lineinfile:
+    path: "{{ path_common_version }}"
+    regexp: 'public const string String'
+    line: '{{ OutputVersionCommon.stdout | trim }}.{{ build_number }}";'
+
+- name: Ищем версию *.MessageService.Common.Web.csproj в *.MessageService.Common.Web
+  win_shell: |
+    Get-ChildItem -Path "{{ path_web_version }}" -recurse | Get-Content | Select-String -Pattern "Microsoft.AspNetCore.StaticFiles" | ForEach-Object {$_ -replace """ />"}
+  register: OutputWeb
+
+- name: Добавляем номер билда в *.MessageService.Common.Web.csproj
+  win_lineinfile:
+    path: "{{ path_web_version }}"
+    regexp: 'Microsoft.AspNetCore.StaticFiles'
+    line: '{{ OutputWeb.stdout | trim }}.{{ build_number }}" />'
+
+- name: Ищем версию AssemblyVersion в *.MessageService.Launcher.csproj
+  win_shell: |
+      Get-ChildItem -Path "{{ path_launcher_version }}" -recurse | Get-Content | Select-String -Pattern "<AssemblyVersion>" | ForEach-Object {$_ -replace "</AssemblyVersion>"}
+  register: OutputAssemblyVersionLauncher
+
+- name: Ищем версию FileVersion в *.MessageService.Launcher.csproj
+  win_shell: |
+      Get-ChildItem -Path "{{ path_launcher_version }}" -recurse | Get-Content | Select-String -Pattern "<FileVersion>" | ForEach-Object {$_ -replace "</FileVersion>"}
+  register: OutputFileVersionLauncher
+
+- name: Ищем версию Version в *.MessageService.Launcher.csproj
+  win_shell: |
+      Get-ChildItem -Path "{{ path_launcher_version }}" -recurse | Get-Content | Select-String -Pattern "<Version>" | ForEach-Object {$_ -replace "</Version>"}
+  register: OutputVersionLauncher
+
+- name: Добавляем номер билда в *.MessageService.Launcher.csproj
+  win_lineinfile:
+    path: "{{ path_launcher_version }}"
+    regexp: '<{{ item.Version }}>'
+    line: '{{ item.RegisterOutputVersion }}.{{ build_number }}</{{ item.Version }}>'
+  loop:
+    - { Version: 'AssemblyVersion', RegisterOutputVersion: '{{ OutputAssemblyVersionLauncher.stdout | trim }}' }
+    - { Version: 'FileVersion', RegisterOutputVersion: '{{ OutputFileVersionLauncher.stdout | trim }}' }
+    - { Version: 'Version', RegisterOutputVersion: '{{ OutputVersionLauncher.stdout | trim }}' }
+
+- name: Работаем с блоком Portal
+
+  block:
+
+   - name: Паблишем Portal
+     win_command: 'dotnet publish "C:\\{{ branch }}\\*.MessageService.Web\\*.MessageService.Web.csproj" --no-restore -o "{{ path_projectportal }}"'
+
+   - name: Создаем новые папки(если их нет, но уже должны быть после настройки сервера)
+     win_file:
+       path: "{{ item.1.directory }}"
+       state: directory
+     delegate_to: "{{ item.0 }}"
+     loop: "{{ group_portal | product(create_directory) | list }}"
+     vars:
+       create_directory:
+         - { directory: 'C:\\distrib' }
+         - { directory: 'C:\\backup' }
+         - { directory: "{{ path_portal }}" }
+
+   - name: Шарим папки
+     win_share:
+       name: "{{ item.1.folder }}"
+       path: "{{ item.1.directory }}"
+       full: jenkins
+     delegate_to: "{{ item.0 }}"
+     loop: "{{ group_portal | product(create_folder) | list }}"
+     vars:
+       create_folder:
+         - { folder: distrib, directory: "C:\\distrib" }
+         - { folder: Push, directory: "{{ path_push }}" }
+
+### Не вносите путь dest в двойные кавычки: не переносёт файлы на шару, а положит их на локальную машину, но напишет, что все успешно сделано. :) ###
+   - name: Копируем собранный патч на {{ group_portal | join('\n') }}
+     win_robocopy:
+       src: "{{ path_projectportal }}"
+       dest: \\{{ item }}\\distrib\\Portal_{{ var_datetime }}
+       flags: /COPY:DAS /E /MT:128 /XF ReadMe.md /XF *.pdb /XF appsettings.Development.json /XF appsettings.Test.json /XF web.config /XF App.config /XF appsettings.json /XF *.MessageService.Web.dll.config /XF appsettings.json /XF NLog.config
+     loop: "{{ group_portal }}"
+
+   - name: Удаляем Portal
+     win_service:
+       path: "{{ path_portal }}\\*.MessageService.Web.exe"
+       name: *.MessageService.Web
+       state: absent
+     delegate_to: "{{ item }}"
+     loop: "{{ group_portal }}"
+
+   - name: Делаем бекап файлов на {{ group_portal | join('\n') }}
+     win_robocopy:
+       src: "{{ path_portal }}"
+       dest: "C:\\backup\\Portal_{{ var_datetime }}"
+       flags: /COPY:DAS /MT:128 /E /XD Logs
+     delegate_to: "{{ item }}"
+     loop: "{{ group_portal }}"
+
+   - name: Деплоим Portal
+     win_robocopy:
+       src: "C:\\distrib\\Portal_{{ var_datetime }}"
+       dest: "{{ path_portal }}"
+       flags: /PURGE /MT:128 /E /XD Logs
+     delegate_to: "{{ item }}"
+     loop: "{{ group_portal }}"
+     
+   - name: Подкладываем новые конфиги
+     win_template:
+       src: "{{ item.1.path_templates }}/{{ item.1.environment }}/{{ item.1.config_jinja }}"
+       dest: "{{ item.1.path }}\\{{ item.1.config_server }}"
+     delegate_to: "{{ item.0 }}"
+     loop: "{{ group_portal | product(var_environment) | list }}"
+     vars:
+       var_environment:
+         - { path_templates: "{{ path_templates_folder_preprod }}", environment: "{{ name_environment }}", path: "{{ path_portal }}", config_server: appsettings.json, config_jinja: appsettings_portal.json.j2 }
+         - { path_templates: "{{ path_templates_folder_preprod }}", environment: "{{ name_environment }}", path: "{{ path_portal }}", config_server: *.MessageService.Web.dll.config, config_jinja: *.MessageService.Portal.dll.config.j2 }
+         - { path_templates: "{{ path_templates_folder_preprod }}", environment: "{{ name_environment }}", path: "{{ path_portal }}", config_server: NLog.config, config_jinja: NLog_portal.config.j2 }
+     
+   - name: Устанавливаем Portal
+     win_service:
+       path: "{{ path_portal }}\\*.MessageService.Web.exe"
+       name: *.MessageService.Web
+       username: jenkins
+       password: "{{ jenkins_password }}"
+       state: started
+       start_mode: auto
+     delegate_to: "{{ item }}"
+     loop: "{{ group_portal }}"
+
+  when: node == "Portal"
+
+- name: Работаем с блоком Service
+
+  block:
+
+   - name: Паблишем Service
+     win_command: 'dotnet publish "C:\\{{ branch }}\\*.MessageService.Launcher\\*.MessageService.Launcher.csproj" --no-restore -o "{{ path_projectservice }}"'
+
+   - name: Создаем новые папки
+     win_file:
+       path: "{{ item.1.directory }}"
+       state: directory
+     delegate_to: "{{ item.0 }}"
+     loop: "{{ group_service | product(create_directory) | list }}"
+     vars:
+       create_directory:
+         - { directory: 'C:\\distrib' }
+         - { directory: "{{ path_push }}" }
+         - { directory: 'C:\\backup' }
+         - { directory: "{{ path_service }}" }
+
+   - name: Шарим папки
+     win_share:
+       name: "{{ item.1.folder }}"
+       path: "{{ item.1.directory }}"
+       full: jenkins
+     delegate_to: "{{ item.0 }}"
+     loop: "{{ group_service | product(create_folder) | list }}"
+     vars:
+       create_folder:
+         - { folder: distrib, directory: "C:\\distrib" }
+         - { folder: Push, directory: "{{ path_push }}" }
+
+### Не вносите путь dest в двойные кавычки: не переносёт файлы на шару, а положит их на локальную машину, но напишет, что все успешно сделано. :) ###
+   - name: Копируем собранный патч на {{ group_service | join('\n') }}
+     win_robocopy:
+       src: "{{ path_projectservice }}"
+       dest: \\{{ item }}\\distrib\\Service_{{ var_datetime }}
+       flags: /COPY:DAS /E /MT:128 /XF *.pdb /XD app.publish /XF *.cs /XF *.resx /XF App.Development.config /XF App.config /XF *.MessageService.Launcher.dll.config /XF NLog.config /XF *.MessageService.dll.config /XF appsettings.Development.json /XF appsettings.Test.json /XF appsettings.json /XF web.config
+     loop: "{{ group_service }}"
+
+   - name: Удаляем Service
+     win_service:
+       path: "{{ path_service }}\\*.MessageService.Launcher.exe"
+       name: *.MessageService.Launcher
+       state: absent
+     delegate_to: "{{ item }}"
+     loop: "{{ group_service }}"
+
+   - name: Делаем бекап файлов на {{ group_service | join('\n') }}
+     win_robocopy:
+       src: "{{ path_service }}"
+       dest: "C:\\backup\\Service_{{ var_datetime }}"
+       flags: /COPY:DAS /MT:128 /E /XD Logs /XD LogsETL
+     delegate_to: "{{ item }}"
+     loop: "{{ group_service }}"
+
+   - name: Деплоим Service
+     win_robocopy:
+       src: "c:\\distrib\\Service_{{ var_datetime }}"
+       dest: "{{ path_service }}"
+       flags: /PURGE /MT:128 /E /XD Logs /XD LogsETL
+     delegate_to: "{{ item }}"
+     loop: "{{ group_service }}"
+     
+   - name: Подкладываем новые конфиги
+     win_template:
+       src: "{{ item.1.path_templates }}/{{ item.1.environment }}/{{ item.1.config_jinja }}"
+       dest: "{{ item.1.path }}\\{{ item.1.config_server }}"
+     delegate_to: "{{ item.0 }}"
+     loop: "{{ group_service | product(var_environment) | list }}"
+     vars:
+       var_environment:
+         - { path_templates: "{{ path_templates_folder_preprod }}", environment: "{{ name_environment }}", path: "{{ path_service }}", config_server: *.MessageService.dll.config, config_jinja: *.MessageService.Launcher.dll.config.j2 }
+         - { path_templates: "{{ path_templates_folder_preprod }}", environment: "{{ name_environment }}", path: "{{ path_service }}", config_server: NLog.config, config_jinja: NLog_launcher.config.j2 }
+         - { path_templates: "{{ path_templates_folder_preprod }}", environment: "{{ name_environment }}", path: "{{ path_service }}", config_server: appsettings.json, config_jinja: appsettings_launcher.json.j2 }
+
+   - name: Устанавливаем Service
+     win_service:
+       path: "{{ path_service }}\\*.MessageService.exe"
+       name: *.MessageService.Launcher
+       username: jenkins
+       password: "{{ jenkins_password }}"
+       start_mode: auto
+       state: started
+     delegate_to: "{{ item }}"
+     loop: "{{ group_service }}"
+
+  when: node == "Service"
+
+- name: Работаем с блоком, где одновременно деплоится Portal и Service
+
+  block:
+
+   - name: Паблишем Portal
+     win_command: 'dotnet publish "C:\\{{ branch }}\\*.MessageService.Web\\*.MessageService.Web.csproj" --no-restore -o "{{ path_projectportal }}"'
+     
+   - name: Паблишем Service
+     win_command: 'dotnet publish "C:\\{{ branch }}\\*.MessageService.Launcher\\*.MessageService.Launcher.csproj" --no-restore -o "{{ path_projectservice }}"'
+
+   - name: Создаем новые папки
+     win_file:
+       path: "{{ item.1.directory }}"
+       state: directory
+     delegate_to: "{{ item.0 }}"
+     loop: "{{ environment_groups | product(create_directory) | list }}"
+     vars:
+       create_directory:
+         - { directory: 'C:\\distrib' }
+         - { directory: "{{ path_push }}" }
+         - { directory: 'C:\\backup' }
+         - { directory: "{{ path_service }}" }
+         - { directory: "{{ path_portal }}" }
+
+   - name: Шарим папки
+     win_share:
+       name: "{{ item.1.folder }}"
+       path: "{{ item.1.directory }}"
+       full: jenkins
+     delegate_to: "{{ item.0 }}"
+     loop: "{{ environment_groups | product(create_folder) | list }}"
+     vars:
+       create_folder:
+         - { folder: distrib, directory: "C:\\distrib" }
+         - { folder: Push, directory: "{{ path_push }}" }
+
+### Не вносите путь dest в двойные кавычки: не переносёт файлы на шару, а положит их на локальную машину, но напишет, что все успешно сделано. :) ###
+   - name: Копируем собранный патч на {{ group_portal | join('\n') }}
+     win_robocopy:
+       src: "{{ path_projectportal }}"
+       dest: \\{{ item }}\\distrib\\Portal_{{ var_datetime }}
+       flags: /COPY:DAS /E /MT:128 /XF ReadMe.md /XF *.pdb /XF appsettings.Development.json /XF appsettings.Test.json /XF web.config /XF App.config /XF appsettings.json /XF *.MessageService.Web.dll.config /XF NLog.config
+     loop: "{{ group_portal }}"
+
+### Не вносите путь dest в двойные кавычки: не переносёт файлы на шару, а положит их на локальную машину, но напишет, что все успешно сделано. :) ###
+   - name: Копируем собранный патч на {{ group_service | join('\n') }}
+     win_robocopy:
+       src: "{{ path_projectservice }}"
+       dest: \\{{ item }}\\distrib\\Service_{{ var_datetime }}
+       flags: /COPY:DAS /E /MT:128 /XF *.pdb /XD app.publish /XF *.cs /XF *.resx /XF App.Development.config /XF App.config /XF *.MessageService.Launcher.dll.config /XF NLog.config /XF *.MessageService.dll.config /XF appsettings.Development.json /XF appsettings.Test.json /XF appsettings.json /XF web.config
+     loop: "{{ group_service }}"
+
+   - name: Делаем бекап файлов на {{ group_portal | join('\n') }}
+     win_robocopy:
+       src: "{{ path_portal }}"
+       dest: "C:\\backup\\Portal_{{ var_datetime }}"
+       flags: /COPY:DAS /MT:128 /E /XD Logs
+     delegate_to: "{{ item }}"
+     loop: "{{ group_portal }}"
+
+   - name: Делаем бекап файлов на {{ group_service | join('\n') }}
+     win_robocopy:
+       src: "{{ path_service }}"
+       dest: "C:\\backup\\Service_{{ var_datetime }}"
+       flags: /COPY:DAS /MT:128 /E /XD Logs /XD LogsETL
+     delegate_to: "{{ item }}"
+     loop: "{{ group_service }}"
+
+   - name: Удаляем Portal
+     win_service:
+       path: "{{ path_portal }}\\*.MessageService.Web.exe"
+       name: *.MessageService.Web
+       state: absent
+     delegate_to: "{{ item }}"
+     loop: "{{ group_portal }}"
+
+   - name: Удаляем Service
+     win_service:
+       path: "{{ path_service }}\\*.MessageService.Launcher.exe"
+       name: *.MessageService.Launcher
+       state: absent
+     delegate_to: "{{ item }}"
+     loop: "{{ group_service }}"
+
+   - name: Деплоим Portal
+     win_robocopy:
+       src: "C:\\distrib\\Portal_{{ var_datetime }}"
+       dest: "{{ path_portal }}"
+       flags: /PURGE /MT:128 /E /XD Logs
+     delegate_to: "{{ item }}"
+     loop: "{{ group_portal }}"
+
+   - name: Деплоим Service
+     win_robocopy:
+       src: "c:\\distrib\\Service_{{ var_datetime }}"
+       dest: "{{ path_service }}"
+       flags: /PURGE /MT:128 /E /XF *.config /XD Logs /XD LogsETL
+     delegate_to: "{{ item }}"
+     loop: "{{ group_service }}"
+     
+   - name: Подкладываем новые конфиги
+     win_template:
+       src: "{{ item.1.path_templates }}/{{ item.1.environment }}/{{ item.1.config_jinja }}"
+       dest: "{{ item.1.path }}\\{{ item.1.config_server }}"
+     delegate_to: "{{ item.0 }}"
+     loop: "{{ environment_groups | product(var_environment) | list }}"
+     vars:
+       var_environment:
+         - { path_templates: "{{ path_templates_folder_preprod }}", environment: "{{ name_environment }}", path: "{{ path_portal }}", config_server: appsettings.json, config_jinja: appsettings_portal.json.j2 }
+         - { path_templates: "{{ path_templates_folder_preprod }}", environment: "{{ name_environment }}", path: "{{ path_portal }}", config_server: *.MessageService.Web.dll.config, config_jinja: *.MessageService.Portal.dll.config.j2 }
+         - { path_templates: "{{ path_templates_folder_preprod }}", environment: "{{ name_environment }}", path: "{{ path_portal }}", config_server: NLog.config, config_jinja: NLog_portal.config.j2 }
+         - { path_templates: "{{ path_templates_folder_preprod }}", environment: "{{ name_environment }}", path: "{{ path_service }}", config_server: *.MessageService.dll.config, config_jinja: *.MessageService.Launcher.dll.config.j2 }
+         - { path_templates: "{{ path_templates_folder_preprod }}", environment: "{{ name_environment }}", path: "{{ path_service }}", config_server: appsettings.json, config_jinja: appsettings_launcher.json.j2 }
+         - { path_templates: "{{ path_templates_folder_preprod }}", environment: "{{ name_environment }}", path: "{{ path_service }}", config_server: NLog.config, config_jinja: NLog_launcher.config.j2 }
+
+   - name: Устанавливаем Service
+     win_service:
+       path: "{{ path_service }}\\*.MessageService.exe"
+       name: *.MessageService.Launcher
+       username: jenkins
+       password: "{{ jenkins_password }}"
+       start_mode: auto
+       state: started
+     delegate_to: "{{ item }}"
+     loop: "{{ group_service }}"
+
+   - name: Устанавливаем Portal
+     win_service:
+       path: "{{ path_portal }}\\*.MessageService.Web.exe"
+       name: *.MessageService.Web
+       username: jenkins
+       password: "{{ jenkins_password }}"
+       state: started
+       start_mode: auto
+     delegate_to: "{{ item }}"
+     loop: "{{ group_portal }}"
+
+  when: node == "All"

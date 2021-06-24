@@ -1,0 +1,5 @@
+[defaults]
+
+inventory = /etc/ansible/hosts
+roles_path = /etc/ansible/roles
+vault_password_file = /etc/ansible/roles/ansible_vault_pass

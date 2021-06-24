@@ -1,0 +1,535 @@
+pipeline {
+    agent { label 'slave-push' }
+    parameters {
+        choice(
+            choices: ['-', 'DevelopPortal', 'DevelopService', 'DevelopAll', 'Develop2Portal', 'Develop2Service', 'Develop2All', 'FTPortal', 'FTService', 'FTAll', 'Load1Portal', 'Load1Service', 'Load1All', 'Load2Portal', 'Load2Service', 'Load2All', 'PreprodPortal', 'PreprodService', 'PreprodAll', 'ProdPortal', 'ProdService', 'ProdAll'],
+            description: 'Choose what you want to deploy Portal, Api, PUSH SERVICE(stubs&sender) or all(*All)',
+            name: 'AutoDeploy')
+
+        gitParameter branchFilter: 'origin/(.*)', defaultValue: 'master', name: 'BranchGit', type: 'PT_BRANCH_TAG', sortMode: 'ASCENDING', useRepository: 'ssh://git@stash.dev.itc.DOMENNAME.ru:7999/push/server.git',
+        description: 'Choose a brunch from which AUTODEPLOY PUSH'
+    }
+    
+    options {
+        ansiColor('xterm')
+        skipStagesAfterUnstable()
+    }
+    
+    stages {
+
+        stage ('check changes repository') {
+            steps {
+                checkout([$class: 'GitSCM', branches: [[name: "${params.BranchGit}"]], doGenerateSubmoduleConfigurations: false, extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'PUSH']], submoduleCfg: [], userRemoteConfigs: [[credentialsId: 'ef4442ab-0431-45c5-af5a-6e791ce53440', url: 'ssh://git@stash.dev.itc.DOMENNAME.ru:7999/push/server.git']]])
+            }
+        }
+
+        stage ('Rewrite Build Name') {
+            steps {
+                script {
+                    currentBuild.displayName = "${AutoDeploy}_${BranchGit}.${currentBuild.number}"
+                }
+            }
+        }
+
+        stage ('run unit test&coverage') {
+            environment {
+                LastCommit = """${sh(returnStdout:true, script: 'cd ${WORKSPACE}/PUSH&&git log -1 --stat')}"""
+                    }
+            steps {
+                script {
+                    try {
+                        sh 'dotnet test --results-directory:"../coverlet/" --collect:"XPlat Code Coverage" --settings ${WORKSPACE}/PUSH/*/coverlet.runsettings /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura ${WORKSPACE}/PUSH/'
+                        dir("../coverlet/"){
+                           cobertura coberturaReportFile: '**/coverage.cobertura.xml', autoUpdateHealth: false, autoUpdateStability: false, failUnhealthy: false, failUnstable: false, maxNumberOfBuilds: 30, onlyStable: false, failNoReports: false
+                        }
+                    }
+                    catch (ex) {
+                        unstable('FAILED UNIT TESTS')
+                        mail (to: 'Dmitriy.Vtulkin@DOMENNAME.ru,Vladimir.Avdiev@DOMENNAME.ru,Maksim.Shulapov@DOMENNAME.ru,Igor.Zlatomrezhev@DOMENNAME.ru,Aleksandr.M.Semenov@DOMENNAME.ru,Andrey.Omelchuk@DOMENNAME.ru', subject: "UNIT TEST FAILED ${AutoDeploy}_${BranchGit}.${currentBuild.number}", body: "URL сборки, в которой зафеилился unit тест(ы) - ${BUILD_URL}console \n Автор коммита и последний коммит: \n ${env.LastCommit}");
+                    }
+                }
+            }
+        }
+      
+        stage ('delete project start') {
+            steps {
+                sh 'rm -rf /etc/ansible/*'
+            }
+        }
+        
+        stage ('AutoDeploy FTPortal') {
+            environment {
+              ANSIBLE_FORCE_COLOR = true
+            }
+            when {
+                expression { params.AutoDeploy == 'FTPortal' }
+            }
+            steps {
+                sh 'cp -R ${WORKSPACE}/PushDeploy/* /etc/ansible/&&cd /etc/ansible'
+                sh 'ansible-playbook -vvvv /etc/ansible/RUN.yml --extra-var "branch=${BranchGit} build_number=${BUILD_NUMBER} run_roles=ft_server name_environment=ft group_portal={{ groups.ft_Portal }} node=Portal"'
+            }
+        }
+        
+        stage ('AutoDeploy FTService') {
+            environment {
+              ANSIBLE_FORCE_COLOR = true
+            }
+            when {
+                expression { params.AutoDeploy == 'FTService' }
+            }
+            steps {
+                sh 'cp -R ${WORKSPACE}/PushDeploy/* /etc/ansible/&&cd /etc/ansible'
+                sh 'ansible-playbook -vvvv /etc/ansible/RUN.yml --extra-var "branch=${BranchGit} build_number=${BUILD_NUMBER} run_roles=ft_server name_environment=ft group_service={{ groups.ft_service }} node=Service"'
+            }
+        }
+        
+        stage ('AutoDeploy FTAll') {
+            environment {
+              ANSIBLE_FORCE_COLOR = true
+            }
+            when {
+                expression { params.AutoDeploy == 'FTAll' }
+            }
+            steps {
+                sh 'cp -R ${WORKSPACE}/PushDeploy/* /etc/ansible/&&cd /etc/ansible'
+                sh 'ansible-playbook -vvvv /etc/ansible/RUN.yml --extra-var "branch=${BranchGit} build_number=${BUILD_NUMBER} run_roles=ft_server name_environment=ft group_service={{ groups.ft_service }} group_portal={{ groups.ft_Portal }} environment_groups={{ groups[\'ft\'] }} node=All"'
+            }
+        }
+
+        stage ('Run Allure FT') {
+            when {
+                expression { params.AutoDeploy ==~ /(FTPortal|FTService|FTAll)/ }
+            }
+            steps {
+                script {
+                    try {
+                        build job: 'PUSH.Autotests/api/api_ft'
+                        copyArtifacts filter: 'allure-results/', projectName: 'PUSH.Autotests/api/api_ft', selector: workspace()
+                        allure commandline: 'allure', includeProperties: false, jdk: '', results: [[path: 'allure-results']]
+                    }
+                    catch (ex) {
+                        unstable('FAILED Allure')
+                        copyArtifacts filter: 'allure-results/', projectName: 'PUSH.Autotests/api/api_ft', selector: workspace()
+                        allure commandline: 'allure', includeProperties: false, jdk: '', results: [[path: 'allure-results']]
+                        mail (to: 'Dmitriy.Vtulkin@DOMENNAME.ru,Vladimir.Avdiev@DOMENNAME.ru,Maksim.Shulapov@DOMENNAME.ru,Igor.Zlatomrezhev@DOMENNAME.ru,Aleksandr.M.Semenov@DOMENNAME.ru,Andrey.Omelchuk@DOMENNAME.ru', subject: "UNSTABLE BUILD SEE ALLURE REPORT. SUCCESS DEPLOY ${AutoDeploy}_${BranchGit}.${BUILD_NUMBER}", body: "URL нестабильной сборки - ${BUILD_URL}console, \n отчет Coverage - ${BUILD_URL}cobertura, \n Отчет allure - ${BUILD_URL}allure");
+                    }
+                }
+            }
+        }
+
+        stage ('AutoDeploy DevelopPortal') {
+            environment {
+              ANSIBLE_FORCE_COLOR = true
+            }
+            when {
+                expression { params.AutoDeploy == 'DevelopPortal' }
+            }
+            steps {
+                sh 'cp -R ${WORKSPACE}/PushDeploy/* /etc/ansible/&&cd /etc/ansible'
+                sh 'ansible-playbook -vvvv /etc/ansible/RUN.yml --extra-var "branch=${BranchGit} build_number=${BUILD_NUMBER} run_roles=develop_server name_environment=Develop group_portal={{ groups.Develop_Portal }} node=Portal"'
+            }
+        }
+        
+        stage ('AutoDeploy DevelopService') {
+            environment {
+              ANSIBLE_FORCE_COLOR = true
+            }
+            when {
+                expression { params.AutoDeploy == 'DevelopService' }
+            }
+            steps {
+                sh 'cp -R ${WORKSPACE}/PushDeploy/* /etc/ansible/&&cd /etc/ansible'
+                sh 'ansible-playbook -vvvv /etc/ansible/RUN.yml --extra-var "branch=${BranchGit} build_number=${BUILD_NUMBER} run_roles=develop_server name_environment=Develop group_service={{ groups.Develop_service }} node=Service"'
+            }
+        }
+        
+        stage ('AutoDeploy DevelopAll') {
+            environment {
+              ANSIBLE_FORCE_COLOR = true
+            }
+            when {
+                expression { params.AutoDeploy == 'DevelopAll' }
+            }
+            steps {
+                sh 'cp -R ${WORKSPACE}/PushDeploy/* /etc/ansible/&&cd /etc/ansible'
+                sh 'ansible-playbook -vvvv /etc/ansible/RUN.yml --extra-var "branch=${BranchGit} build_number=${BUILD_NUMBER} run_roles=develop_server name_environment=Develop group_service={{ groups.Develop_service }} group_portal={{ groups.Develop_Portal }} environment_groups={{ groups[\'Develop\'] }} node=All"'
+            }
+        }
+        
+        stage ('Run Allure DEV') {
+            when {
+                expression { params.AutoDeploy ==~ /(DevelopPortal|DevelopService|DevelopAll)/ }
+            }
+            steps {
+                script {
+                    try {
+                       build job: 'PUSH.Autotests/api/api_dev'
+                       copyArtifacts filter: 'allure-results/', projectName: 'PUSH.Autotests/api/api_dev', selector: workspace()
+                       allure commandline: 'allure', includeProperties: false, jdk: '', results: [[path: 'allure-results']]
+                    }
+                    catch (ex) {
+                        unstable('FAILED Allure')
+                        copyArtifacts filter: 'allure-results/', projectName: 'PUSH.Autotests/api/api_dev', selector: workspace()
+                        allure commandline: 'allure', includeProperties: false, jdk: '', results: [[path: 'allure-results']]
+                        mail (to: 'Dmitriy.Vtulkin@DOMENNAME.ru,Vladimir.Avdiev@DOMENNAME.ru,Maksim.Shulapov@DOMENNAME.ru,Igor.Zlatomrezhev@DOMENNAME.ru,Aleksandr.M.Semenov@DOMENNAME.ru,Andrey.Omelchuk@DOMENNAME.ru', subject: "UNSTABLE BUILD SEE ALLURE REPORT. SUCCESS DEPLOY ${AutoDeploy}_${BranchGit}.${BUILD_NUMBER}", body: "URL нестабильной сборки - ${BUILD_URL}console, \n отчет Coverage - ${BUILD_URL}cobertura, \n Отчет allure - ${BUILD_URL}allure");
+                    }
+                }
+            }
+        }
+
+        stage ('AutoDeploy Develop2Portal') {
+            environment {
+              ANSIBLE_FORCE_COLOR = true
+            }
+            when {
+                expression { params.AutoDeploy == 'Develop2Portal' }
+            }
+            steps {
+                sh 'cp -R ${WORKSPACE}/PushDeploy/* /etc/ansible/&&cd /etc/ansible'
+                sh 'ansible-playbook -vvvv /etc/ansible/RUN.yml --extra-var "branch=${BranchGit} build_number=${BUILD_NUMBER} run_roles=develop2_server name_environment=dev2 group_portal={{ groups.Develop2_Portal }} node=Portal"'
+            }
+        }
+        
+        stage ('AutoDeploy Develop2Service') {
+            environment {
+              ANSIBLE_FORCE_COLOR = true
+            }
+            when {
+                expression { params.AutoDeploy == 'Develop2Service' }
+            }
+            steps {
+                sh 'cp -R ${WORKSPACE}/PushDeploy/* /etc/ansible/&&cd /etc/ansible'
+                sh 'ansible-playbook -vvvv /etc/ansible/RUN.yml --extra-var "branch=${BranchGit} build_number=${BUILD_NUMBER} run_roles=develop2_server name_environment=dev2 group_service={{ groups.Develop2_service }} node=Service"'
+            }
+        }
+        
+        stage ('AutoDeploy Develop2All') {
+            environment {
+              ANSIBLE_FORCE_COLOR = true
+            }
+            when {
+                expression { params.AutoDeploy == 'Develop2All' }
+            }
+            steps {
+                sh 'cp -R ${WORKSPACE}/PushDeploy/* /etc/ansible/&&cd /etc/ansible'
+                sh 'ansible-playbook -vvvv /etc/ansible/RUN.yml --extra-var "branch=${BranchGit} build_number=${BUILD_NUMBER} run_roles=develop2_server name_environment=dev2 group_service={{ groups.Develop2_service }} group_portal={{ groups.Develop2_Portal }} environment_groups={{ groups[\'Develop2\'] }} node=All"'
+            }
+        }
+
+        stage ('Run Allure DEV2') {
+            when {
+                expression { params.AutoDeploy ==~ /(Develop2Portal|Develop2Service|Develop2All)/ }
+            }
+            steps {
+                script {
+                    try {
+                       build job: 'PUSH.Autotests/api/api_dev-test'
+                       copyArtifacts filter: 'allure-results/', projectName: 'PUSH.Autotests/api/api_dev-test', selector: workspace()
+                       allure commandline: 'allure', includeProperties: false, jdk: '', results: [[path: 'allure-results']]
+                    }
+                    catch (ex) {
+                        unstable('FAILED Allure')
+                        copyArtifacts filter: 'allure-results/', projectName: 'PUSH.Autotests/api/api_dev-test', selector: workspace()
+                        allure commandline: 'allure', includeProperties: false, jdk: '', results: [[path: 'allure-results']]
+                        mail (to: 'Dmitriy.Vtulkin@DOMENNAME.ru,Vladimir.Avdiev@DOMENNAME.ru,Maksim.Shulapov@DOMENNAME.ru,Igor.Zlatomrezhev@DOMENNAME.ru,Aleksandr.M.Semenov@DOMENNAME.ru,Andrey.Omelchuk@DOMENNAME.ru', subject: "UNSTABLE BUILD SEE ALLURE REPORT. SUCCESS DEPLOY ${AutoDeploy}_${BranchGit}.${BUILD_NUMBER}", body: "URL нестабильной сборки - ${BUILD_URL}console, \n отчет Coverage - ${BUILD_URL}cobertura, \n Отчет allure - ${BUILD_URL}allure");
+                    }
+                }
+            }
+        }
+
+        stage ('AutoDeploy Load1Portal') {
+            environment {
+              ANSIBLE_FORCE_COLOR = true
+            }
+            when {
+                expression { params.AutoDeploy == 'Load1Portal' }
+            }
+            steps {
+                sh 'cp -R ${WORKSPACE}/PushDeploy/* /etc/ansible/&&cd /etc/ansible'
+                sh 'ansible-playbook -vvvv /etc/ansible/RUN.yml --extra-var "branch=${BranchGit} build_number=${BUILD_NUMBER} run_roles=load1_server name_environment=load1 group_portal={{ groups.load1_Portal }} node=Portal"'
+            }
+        }
+        
+        stage ('AutoDeploy Load1Service') {
+            environment {
+              ANSIBLE_FORCE_COLOR = true
+            }
+            when {
+                expression { params.AutoDeploy == 'Load1Service' }
+            }
+            steps {
+                sh 'cp -R ${WORKSPACE}/PushDeploy/* /etc/ansible/&&cd /etc/ansible'
+                sh 'ansible-playbook -vvvv /etc/ansible/RUN.yml --extra-var "branch=${BranchGit} build_number=${BUILD_NUMBER} run_roles=load1_server name_environment=load1 group_service={{ groups.load1_service }} node=Service"'
+            }
+        }
+        
+        stage ('AutoDeploy Load1All') {
+            environment {
+              ANSIBLE_FORCE_COLOR = true
+            }
+            when {
+                expression { params.AutoDeploy == 'Load1All' }
+            }
+            steps {
+                sh 'cp -R ${WORKSPACE}/PushDeploy/* /etc/ansible/&&cd /etc/ansible'
+                sh 'ansible-playbook -vvvv /etc/ansible/RUN.yml --extra-var "branch=${BranchGit} build_number=${BUILD_NUMBER} run_roles=load1_server name_environment=load1 group_service={{ groups.load1_service }} group_portal={{ groups.load1_Portal }} environment_groups={{ groups[\'load1\'] }} node=All"'
+            }
+        }
+
+        stage ('Run Allure LOAD1') {
+            when {
+                expression { params.AutoDeploy ==~ /(Load1Service|Load1Portal|Load1All)/ }
+            }
+            steps {
+                script {
+                    try {
+                       build job: 'PUSH.Autotests/api/api_load1'
+                       copyArtifacts filter: 'allure-results/', projectName: 'PUSH.Autotests/api/api_load1', selector: workspace()
+                       allure commandline: 'allure', includeProperties: false, jdk: '', results: [[path: 'allure-results']]
+                    }
+                    catch (ex) {
+                        unstable('FAILED Allure')
+                        copyArtifacts filter: 'allure-results/', projectName: 'PUSH.Autotests/api/api_load1', selector: workspace()
+                        allure commandline: 'allure', includeProperties: false, jdk: '', results: [[path: 'allure-results']]
+                        mail (to: 'Dmitriy.Vtulkin@DOMENNAME.ru,Vladimir.Avdiev@DOMENNAME.ru,Maksim.Shulapov@DOMENNAME.ru,Igor.Zlatomrezhev@DOMENNAME.ru,Aleksandr.M.Semenov@DOMENNAME.ru,Andrey.Omelchuk@DOMENNAME.ru', subject: "UNSTABLE BUILD SEE ALLURE REPORT. SUCCESS DEPLOY ${AutoDeploy}_${BranchGit}.${BUILD_NUMBER}", body: "URL нестабильной сборки - ${BUILD_URL}console, \n отчет Coverage - ${BUILD_URL}cobertura, \n Отчет allure - ${BUILD_URL}allure");
+                    }
+                }
+            }
+        }
+        
+        stage ('AutoDeploy Load2Portal') {
+            environment {
+              ANSIBLE_FORCE_COLOR = true
+            }
+            when {
+                expression { params.AutoDeploy == 'Load2Portal' }
+            }
+            steps {
+                sh 'cp -R ${WORKSPACE}/PushDeploy/* /etc/ansible/&&cd /etc/ansible'
+                sh 'ansible-playbook -vvvv /etc/ansible/RUN.yml --extra-var "branch=${BranchGit} build_number=${BUILD_NUMBER} run_roles=load2_server name_environment=load2 group_portal={{ groups.load2_Portal }} node=Portal"'
+            }
+        }
+        
+        stage ('AutoDeploy Load2Service') {
+            environment {
+              ANSIBLE_FORCE_COLOR = true
+            }
+            when {
+                expression { params.AutoDeploy == 'Load2Service' }
+            }
+            steps {
+                sh 'cp -R ${WORKSPACE}/PushDeploy/* /etc/ansible/&&cd /etc/ansible'
+                sh 'ansible-playbook -vvvv /etc/ansible/RUN.yml --extra-var "branch=${BranchGit} build_number=${BUILD_NUMBER} run_roles=load2_server name_environment=load2 group_service={{ groups.load2_service }} node=Service"'
+            }
+        }
+        
+        stage ('AutoDeploy Load2All') {
+            environment {
+              ANSIBLE_FORCE_COLOR = true
+            }
+            when {
+                expression { params.AutoDeploy == 'Load2All' }
+            }
+            steps {
+                sh 'cp -R ${WORKSPACE}/PushDeploy/* /etc/ansible/&&cd /etc/ansible'
+                sh 'ansible-playbook -vvvv /etc/ansible/RUN.yml --extra-var "branch=${BranchGit} build_number=${BUILD_NUMBER} run_roles=load2_server name_environment=load2 group_service={{ groups.load2_service }} group_portal={{ groups.load2_Portal }} environment_groups={{ groups[\'load2\'] }} node=All"'
+            }
+        }
+
+        stage ('Run Allure LOAD2') {
+            when {
+                expression { params.AutoDeploy ==~ /(Load2Service|Load2Portal|Load2All)/ }
+            }
+            steps {
+                script {
+                    try {
+                       build job: 'PUSH.Autotests/api/api_load2'
+                       copyArtifacts filter: 'allure-results/', projectName: 'PUSH.Autotests/api/api_load2', selector: workspace()
+                       allure commandline: 'allure', includeProperties: false, jdk: '', results: [[path: 'allure-results']]
+                    }
+                    catch (ex) {
+                        unstable('FAILED Allure')
+                        copyArtifacts filter: 'allure-results/', projectName: 'PUSH.Autotests/api/api_load2', selector: workspace()
+                        allure commandline: 'allure', includeProperties: false, jdk: '', results: [[path: 'allure-results']]
+                        mail (to: 'Dmitriy.Vtulkin@DOMENNAME.ru,Vladimir.Avdiev@DOMENNAME.ru,Maksim.Shulapov@DOMENNAME.ru,Igor.Zlatomrezhev@DOMENNAME.ru,Aleksandr.M.Semenov@DOMENNAME.ru,Andrey.Omelchuk@DOMENNAME.ru', subject: "UNSTABLE BUILD SEE ALLURE REPORT. SUCCESS DEPLOY ${AutoDeploy}_${BranchGit}.${BUILD_NUMBER}", body: "URL нестабильной сборки - ${BUILD_URL}console, \n отчет Coverage - ${BUILD_URL}cobertura, \n Отчет allure - ${BUILD_URL}allure");
+                    }
+                }
+            }
+        }
+
+        stage ('email approve autodeploy PROD/PREPROD') {
+            when {
+                expression { params.AutoDeploy ==~ /(PreprodPortal|PreprodService|PreprodAll|ProdPortal|ProdService|ProdAll)/ }
+            }
+            steps{
+                emailext subject: "[Jenkins]Approve to deploy ${currentBuild.fullDisplayName}", to: "Dmitriy.Vtulkin@DOMENNAME.ru,Aleksandr.M.Semenov@DOMENNAME.ru", body: '${BUILD_URL}input'
+            }
+        }
+
+        stage ('AutoDeploy PreprodPortal') {
+            environment {
+              ANSIBLE_FORCE_COLOR = true
+            }
+            when {
+                expression { params.AutoDeploy == 'PreprodPortal' }
+                beforeInput true
+            }
+            input {
+                message 'Should we continue?'
+                ok 'Yes, we should.'
+                submitter 'dvtulkin,amsemenov'
+            }
+            steps {
+                sh 'cp -R ${WORKSPACE}/PushDeploy/* /etc/ansible/&&cd /etc/ansible'
+                sh 'ansible-playbook -vvvv /etc/ansible/RUN.yml --extra-var "branch=${BranchGit} build_number=${BUILD_NUMBER} run_roles=test_server name_environment=preprod group_portal={{ groups.preprod_portal }} node=Portal"'
+            }
+        }
+        
+        stage ('AutoDeploy PreprodService') {
+            environment {
+              ANSIBLE_FORCE_COLOR = true
+            }
+            when {
+                expression { params.AutoDeploy == 'PreprodService' }
+                beforeInput true
+            }
+            input {
+                message 'Should we continue?'
+                ok 'Yes, we should.'
+                submitter 'dvtulkin,amsemenov'
+            }
+            steps {
+                sh 'cp -R ${WORKSPACE}/PushDeploy/* /etc/ansible/&&cd /etc/ansible'
+                sh 'ansible-playbook -vvvv /etc/ansible/RUN.yml --extra-var "branch=${BranchGit} build_number=${BUILD_NUMBER} run_roles=test_server name_environment=preprod group_service={{ groups.preprod_service }} node=Service"'
+            }
+        }
+        
+        stage ('AutoDeploy PreprodAll') {
+            environment {
+              ANSIBLE_FORCE_COLOR = true
+            }
+            when {
+                expression { params.AutoDeploy == 'PreprodAll' }
+                beforeInput true
+            }
+            input {
+                message 'Should we continue?'
+                ok 'Yes, we should.'
+                submitter 'dvtulkin,amsemenov'
+            }
+            steps {
+                sh 'cp -R ${WORKSPACE}/PushDeploy/* /etc/ansible/&&cd /etc/ansible'
+                sh 'ansible-playbook -vvvv /etc/ansible/RUN.yml --extra-var "branch=${BranchGit} build_number=${BUILD_NUMBER} run_roles=test_server name_environment=preprod group_service={{ groups.preprod_service }} group_portal={{ groups.preprod_portal }} environment_groups={{ groups[\'preprod\'] }} node=All"'
+            }
+        }
+
+        stage ('Run Allure PREPROD') {
+            when {
+                expression { params.AutoDeploy ==~ /(PreprodPortal|PreprodService|PreprodAll)/ }
+            }
+            steps {
+                script {
+                    try {
+                       build job: 'PUSH.Autotests/api/api_preprod'
+                       copyArtifacts filter: 'allure-results/', projectName: 'PUSH.Autotests/api/api_preprod', selector: workspace()
+                       allure commandline: 'allure', includeProperties: false, jdk: '', results: [[path: 'allure-results']]
+                    }
+                    catch (ex) {
+                        unstable('FAILED Allure')
+                        copyArtifacts filter: 'allure-results/', projectName: 'PUSH.Autotests/api/api_preprod', selector: workspace()
+                        allure commandline: 'allure', includeProperties: false, jdk: '', results: [[path: 'allure-results']]
+                        mail (to: 'Dmitriy.Vtulkin@DOMENNAME.ru,Vladimir.Avdiev@DOMENNAME.ru,Maksim.Shulapov@DOMENNAME.ru,Igor.Zlatomrezhev@DOMENNAME.ru,Aleksandr.M.Semenov@DOMENNAME.ru,Andrey.Omelchuk@DOMENNAME.ru', subject: "UNSTABLE BUILD SEE ALLURE REPORT. SUCCESS DEPLOY ${AutoDeploy}_${BranchGit}.${BUILD_NUMBER}", body: "URL нестабильной сборки - ${BUILD_URL}console, \n отчет Coverage - ${BUILD_URL}cobertura, \n Отчет allure - ${BUILD_URL}allure");
+                    }
+                }
+            }
+        }
+
+        stage ('AutoDeploy ProdPortal') {
+            environment {
+              ANSIBLE_FORCE_COLOR = true
+            }
+            when {
+                expression { params.AutoDeploy == 'ProdPortal' }
+                beforeInput true
+            }
+            input {
+                message 'Should we continue?'
+                ok 'Yes, we should.'
+                submitter 'dvtulkin,amsemenov'
+            }
+            steps {
+                sh 'cp -R ${WORKSPACE}/PushDeploy/* /etc/ansible/&&cd /etc/ansible'
+                sh 'ansible-playbook -vvvv /etc/ansible/RUN.yml --extra-var "branch=${BranchGit} build_number=${BUILD_NUMBER} run_roles=prod_server name_environment=prod group_portal={{ groups.prod_portal }} node=Portal"'
+            }
+        }
+        
+        stage ('AutoDeploy ProdService') {
+            environment {
+              ANSIBLE_FORCE_COLOR = true
+            }
+            when {
+                expression { params.AutoDeploy == 'ProdService' }
+                beforeInput true
+            }
+            input {
+                message 'Should we continue?'
+                ok 'Yes, we should.'
+                submitter 'dvtulkin,amsemenov'
+            }
+            steps {
+                sh 'cp -R ${WORKSPACE}/PushDeploy/* /etc/ansible/&&cd /etc/ansible'
+                sh 'ansible-playbook -vvvv /etc/ansible/RUN.yml --extra-var "branch=${BranchGit} build_number=${BUILD_NUMBER} run_roles=prod_server name_environment=prod group_service={{ groups.prod_service }} node=Service"'
+            }
+        }
+        
+        stage ('AutoDeploy ProdAll') {
+            environment {
+              ANSIBLE_FORCE_COLOR = true
+            }
+            when {
+                expression { params.AutoDeploy == 'ProdAll' }
+                beforeInput true
+            }
+            input {
+                message 'Should we continue?'
+                ok 'Yes, we should.'
+                submitter 'dvtulkin,amsemenov'
+            }
+            steps {
+                sh 'cp -R ${WORKSPACE}/PushDeploy/* /etc/ansible/&&cd /etc/ansible'
+                sh 'ansible-playbook -vvvv /etc/ansible/RUN.yml --extra-var "branch=${BranchGit} build_number=${BUILD_NUMBER} run_roles=prod_server name_environment=prod group_service={{ groups.prod_service }} group_portal={{ groups.prod_portal }} environment_groups={{ groups[\'prod\'] }} node=All"'
+            }
+        }
+
+        stage ('SonarQube check code') {
+            steps {
+                script {
+                    try {
+                        tool name: 'sonar-4', type: 'hudson.plugins.sonar.SonarRunnerInstallation';
+                        withSonarQubeEnv('sonar') {
+                        sh "export SONAR_SCANNER_OPTS=-Djavax.net.ssl.trustStore=${JAVA_HOME}/lib/security/cacerts && export NODE_PATH=/usr/lib/node_modules && export FrameworkPathOverride=/lib/mono/ && /opt/sonar-scanner/bin/sonar-scanner -Dsonar.branch.name=${BranchGit} -Dsonar.projectBaseDir=${WORKSPACE}/PUSH -Dsonar.scm.provider=git -Dsonar.host.url=https://sonar.DOMENNAME.ru -Dsonar.projectKey=push-server"
+                }
+            }
+                    catch (ex) {
+                        unstable('FAILED SonarQube')
+                        emailext body: 'Сборка успешна. \n Отчет Coverage - ${BUILD_URL}cobertura. \n Отчет allure - ${BUILD_URL}allure. \n URL сборки, в которой зафеилился SonarQube - ${BUILD_URL}console', subject: 'BUILD PROJECT SUCCESS. SonarQube FAILED ${AutoDeploy}_${BranchGit}.${currentBuild.number}', to: 'Dmitriy.Vtulkin@DOMENNAME.ru, Igor.Zlatomrezhev@DOMENNAME.ru, Maksim.Shulapov@DOMENNAME.ru, Vladimir.Avdiev@DOMENNAME.ru, Aleksandr.M.Semenov@DOMENNAME.ru, Mikhail.Motlokhov@DOMENNAME.ru'
+                }
+            }
+        }
+    }
+
+        stage ('delete project end') {
+            steps {
+                sh 'rm -rf ${WORKSPACE}/*'
+            }
+        }
+    }
+        post {
+            failure {
+                emailext body: 'URL зафеилиной сборки - ${BUILD_URL}console', subject: 'DEPLOY FAILED ${AutoDeploy}_${BranchGit}.${BUILD_NUMBER}', to: 'Dmitriy.Vtulkin@DOMENNAME.ru,Vladimir.Avdiev@DOMENNAME.ru,Maksim.Shulapov@DOMENNAME.ru,Igor.Zlatomrezhev@DOMENNAME.ru,Aleksandr.M.Semenov@DOMENNAME.ru,Andrey.Omelchuk@DOMENNAME.ru'
+                }
+            success {
+                emailext body: 'URL успешной сборки - ${BUILD_URL}console, \n отчет Coverage - ${BUILD_URL}cobertura, \n Отчет allure - ${BUILD_URL}allure \n отчет SonarQube(не забываем выбрать ветку) - https://sonar.DOMENNAME.ru/dashboard?id=push-server', subject: 'SUCCESS DEPLOY ${AutoDeploy}_${BranchGit}.${BUILD_NUMBER}', to: 'Dmitriy.Vtulkin@DOMENNAME.ru,Vladimir.Avdiev@DOMENNAME.ru,Maksim.Shulapov@DOMENNAME.ru,Igor.Zlatomrezhev@DOMENNAME.ru,Aleksandr.M.Semenov@DOMENNAME.ru,Andrey.Omelchuk@DOMENNAME.ru'
+                }
+            }
+        }

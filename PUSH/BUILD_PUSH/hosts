@@ -1,0 +1,27 @@
+###Если тебе надо настроить не одну ноду, а несколько, просто добавь снизу столько хостов, сколько нужно, накатываться они будут по порядку###
+[node_service]
+#os-5200.DOMENNAME.ru
+#os-5277.DOMENNAME.ru
+#os-5264.DOMENNAME.ru
+#os-5267.DOMENNAME.ru
+
+###Если тебе надо настроить не одну ноду, а несколько, просто добавь снизу столько хостов, сколько нужно, накатываться они будут по порядку###
+[node_coordinator]
+#os-5200.DOMENNAME.ru
+#os-5277.DOMENNAME.ru
+#os-5264.DOMENNAME.ru
+#os-5266.DOMENNAME.ru
+
+###Если тебе надо настроить не одну ноду, а несколько, просто добавь снизу столько хостов, сколько нужно, накатываться они будут по порядку###
+[node_all]
+os-5777.DOMENNAME.ru
+os-5778.DOMENNAME.ru
+#os-3458.DOMENNAME.ru
+#os-5200.DOMENNAME.ru
+#os-5264.DOMENNAME.ru
+#os-5277.DOMENNAME.ru
+#os-5201.DOMENNAME.ru
+#os-5346.DOMENNAME.ru
+#os-5349.DOMENNAME.ru
+#os-5350.DOMENNAME.ru
+#os-5408.DOMENNAME.ru

@@ -1,0 +1,124 @@
+  - name: Установка IIS и дополнительных Feature
+    win_feature:
+      name:
+      - File-Services
+      - FS-FileServer
+      - Web-Server
+      - Web-WebServer
+      - Web-Common-Http
+      - Web-Default-Doc
+      - Web-Dir-Browsing
+      - Web-Http-Errors
+      - Web-Static-Content
+      - Web-Health
+      - Web-Http-Logging
+      - Web-Performance
+      - Web-Stat-Compression
+      - Web-Security
+      - Web-Filtering
+      - Web-App-Dev
+      - Web-Net-Ext45
+      - Web-Asp-Net45
+      - Web-ISAPI-Ext
+      - Web-ISAPI-Filter
+      - Web-Mgmt-Tools
+      - Web-Mgmt-Console
+      - NET-Framework-45-ASPNET
+      - NET-WCF-HTTP-Activation45
+      - WAS
+      - WAS-Process-Model
+      - WAS-Config-APIs
+    register: win_feature
+
+  - name: Ребутим хост, что бы Feature применились
+    win_reboot:
+    when: win_feature.reboot_required
+
+  - name: Создаем директорию, куда будем деплоить наш проект
+    win_file:
+      path: "{{ item }}"
+      state: directory
+    loop: "{{ ['C:\\inetpub\\wwwroot\\PublicServices'] }}"
+
+  - name: Выдаем необходимые права на вновь созданую папку
+    win_acl:
+      path: "{{ item[0] }}"
+      user: "{{ item[1] }}"
+      rights: FullControl
+      type: allow
+      state: present
+      inherit: ObjectInherit
+    loop: "{{ ['C:\\inetpub\\wwwroot\\PublicServices'] |product(['LOCAL SERVICE', 'NETWORK SERVICE', 'IIS_IUSRS']) |list }}"
+
+  - name: Удаляем дефолтный сайт
+    win_iis_website:
+      name: "Default Web Site"
+      state: absent
+
+  - name: Удаляем дефолтный пул
+    win_iis_webapppool:
+      name: DefaultAppPool
+      state: absent
+
+  - name: Создаем новые пулы
+    win_iis_webapppool:
+      name: "{{ item }}"
+      state: started
+      autostart: yes
+      startMode: yes
+    loop:
+      - public
+
+  - name: Создаем сайт
+    win_iis_website:
+      name: "{{ item.sitename }}"
+      state: started
+      port: "{{ item.siteport }}"
+      application_pool: "{{ item.apppool }}"
+      physical_path: "{{ item.sitepath }}"
+    loop:
+      - { sitename: 'PublicService', siteport: '9082', apppool: 'public', sitepath: 'C:\inetpub\wwwroot\PublicServices' }
+
+
+  - name: Создаем биндинг для сайта
+    win_iis_webbinding:
+      name: "{{ item.sitename }}"
+      protocol: https
+      port: "{{ item.siteport }}"
+      state: present
+    loop:
+      - { sitename: 'PublicService', siteport: '9083' }
+
+  - name: Создаем аппликейшен пул
+    win_iis_webapplication:
+      name: "{{ item.poolname }}"
+      application_pool: "{{ item.apppool }}"
+      site: "{{ item.sitename }}"
+      state: present
+      physical_path: "{{ item.poolpath }}"
+    loop:
+      - { poolname: 'Coordinator', apppool: 'public', sitename: 'PublicService',  poolpath: 'C:\inetpub\wwwroot\PublicServices' }
+
+  - name: Создаем директорию, куда будем деплоить наш проект Service
+    win_file:
+      path: C:\Push\Server
+      state: directory
+
+  - name: Пилим дырки в FW
+    win_firewall_rule:
+      name: "{{ item.rulename }}"
+      localport: "{{ item.ruleport }}"
+      action: allow
+      direction: in
+      protocol: tcp
+      state: present
+      enabled: yes
+    loop:
+      - { rulename: 'LauncherHTTP(NOT DELETE)', ruleport: '9090' }
+      - { rulename: 'LauncherHTTPS(NOT DELETE)', ruleport: '9091' }
+      - { rulename: 'PublicServicesHTTP(NOT DELETE)', ruleport: '9082' }
+      - { rulename: 'PublicServicesHTTPS(NOT DELETE)', ruleport: '9083' }
+      - { rulename: 'PushApiHTTP(NOT DELETE)', ruleport: '9092' }
+      - { rulename: 'PushApiHTTPS(NOT DELETE)', ruleport: '9093' }
+      - { rulename: 'PortalHTTP(NOT DELETE)', ruleport: '80' }
+      - { rulename: 'PortalHTTPS(NOT DELETE)', ruleport: '443' }

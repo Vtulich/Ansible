@@ -1,0 +1,5 @@
+- hosts: "{{ environment_variable }}"
+  gather_facts: no
+
+  roles:
+    - "{{ run_roles }}"
