@@ -1,0 +1,10 @@
+[defaults]
+inventory = /etc/ansible/hosts
+###Что бы избежать подтверждения ключа на новом хосте###
+host_key_checking = False
+###Ускоряем подключение к машинам###
+pipelining = true
+###Говорим использовать аутентификацию по ключу и не пробовать остальные способы(должно ускорить установку соединения)###
+ssh_args = -o ControlMaster=auto -o ControlPersist=60s -o PreferredAuthentications=publickey
+###Показывает время выполнения таска###
+callback_whitelist = profile_tasks

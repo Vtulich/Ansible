@@ -1,0 +1,7 @@
+- name: update web servers
+  gather_facts: false
+  hosts: all
+
+  tasks:
+  - name: ensure apache is at the latest version
+    action: ping
