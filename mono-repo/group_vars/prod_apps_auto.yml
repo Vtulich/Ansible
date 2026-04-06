@@ -1,0 +1,552 @@
+﻿deploy_user: edox-cicd-s
+deploy_group: root
+devops_compose_files_dir: /opt/docker
+env_code: prod
+consul_env_code: prd-edor02
+consul_env_path: prd/edor02
+consul_datacenter: dc-msk-infra
+default_image: "edoxauto-docker-local.artifact.firm.ru/{{ service_name }}:{{ service_version }}"
+vault_agent_api_url: "http://127.0.0.1:8101"
+vault_agent_name_directory: "vault_proxy_prod_edox_auto"
+vault_ansible_secret_path: "project/data/edox_auto/{{ env_code }}/ansible_secrets"
+vault_project_path: "project"
+vault_proxy_url: "http://vault-agent:8101/"
+vault_services_secret_path: "edox_auto/{{ env_code }}/{{ service_name }}/settings"
+vault_services_secret_path_cb: "edox_auto/{{ env_code }}/certs/{{ env_code }}_certs"
+vault_services_secret_path_cb_diadoc: "edox_auto/{{ env_code }}/certs/DiaDoc"
+vault_services_settings_secret_path: "{{ service_name }}/settings"
+
+otel_env:
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+  OTEL_EXPORTER_HEALTHCHECK_ENDPOINT: "http://otel-collector:13133"
+  OTEL_SDK_DISABLED: "false"
+
+services:
+  certificates-manager:
+    enable_otel: true
+    tcp_port: 6940:8081
+    grpc_port: 6941:8082
+    environment:
+      GRPC_DNS_RESOLVER: native
+      ConsulSettings__ConsulEndpoint: http://consul-agent:8500
+      ConsulSettings__ServiceHost: "{{ target_server_name }}"
+      ConsulSettings__ConfigPrefix: "{{ consul_env_path }}/{{ data_center }}"
+      ConsulSettings__ServiceName: "{{ service_name }}"
+      ConsulSettings__SettingsName: "{{ service_version }}/settings.{{ service_config_version }}"
+      ConsulSettings__ServicePrefix: "{{ consul_env_code }}"
+      ConsulSettings__ServiceIdSuffix: "{{ target_server_name }}"
+      ConsulSettings__HealthCheckServiceHost: "{{ service_name }}"
+      ConsulSettings__HttpPort: "6940"
+      ConsulSettings__GrpcPort: "6941"
+      ConsulSettings__HealthCheckHttpPort: "8081"
+      ConsulSettings__HealthCheckGrpcPort: "8082"
+  blacklists:
+    enable_otel: true
+    tcp_port: 16900:8081
+    grpc_port: 16901:8082
+    environment:
+      GRPC_DNS_RESOLVER: native
+      ConsulSettings__ConsulEndpoint: http://consul-agent:8500
+      ConsulSettings__ServiceHost: "{{ target_server_name }}"
+      ConsulSettings__ConfigPrefix: "{{ consul_env_path }}/{{ data_center }}"
+      ConsulSettings__ServiceName: "{{ service_name }}"
+      ConsulSettings__SettingsName: "{{ service_version }}/settings.{{ service_config_version }}"
+      ConsulSettings__ServicePrefix: "{{ consul_env_code }}"
+      ConsulSettings__ServiceIdSuffix: "{{ target_server_name }}"
+      ConsulSettings__HealthCheckServiceHost: "{{ service_name }}"
+      ConsulSettings__HttpPort: "8081"
+      ConsulSettings__GrpcPort: "8082"
+  blacklists-async:
+    enable_otel: true
+    tcp_port: 26920:8081
+    environment:
+      GRPC_DNS_RESOLVER: native
+      ConsulSettings__ConsulEndpoint: http://consul-agent:8500
+      ConsulSettings__ServiceHost: "{{ target_server_name }}"
+      ConsulSettings__ConfigPrefix: "{{ consul_env_path }}/{{ data_center }}"
+      ConsulSettings__ServiceName: "{{ service_name }}"
+      ConsulSettings__SettingsName: "{{ service_version }}/settings.{{ service_config_version }}"
+      ConsulSettings__ServicePrefix: "{{ consul_env_code }}"
+      ConsulSettings__ServiceIdSuffix: "{{ target_server_name }}"
+      ConsulSettings__HealthCheckServiceHost: "{{ service_name }}"
+      ConsulSettings__HttpPort: "26920"
+      ConsulSettings__HealthCheckHttpPort: "8081"
+  blacklists-loaders:
+    enable_otel: true
+    tcp_port: 6560:8081
+    grpc_port: 6561:8082
+    environment:
+      GRPC_DNS_RESOLVER: native
+      ConsulSettings__ConsulEndpoint: http://consul-agent:8500
+      ConsulSettings__ServiceHost: "{{ target_server_name }}"
+      ConsulSettings__ConfigPrefix: "{{ consul_env_path }}/{{ data_center }}"
+      ConsulSettings__ServiceName: "{{ service_name }}"
+      ConsulSettings__SettingsName: "{{ service_version }}/settings.{{ service_config_version }}"
+      ConsulSettings__ServicePrefix: "{{ consul_env_code }}"
+      ConsulSettings__ServiceIdSuffix: "{{ target_server_name }}"
+      ConsulSettings__HealthCheckServiceHost: "{{ service_name }}"
+      ConsulSettings__HttpPort: "6560"
+      ConsulSettings__GrpcPort: "6561"
+      ConsulSettings__HealthCheckHttpPort: "8081"
+      ConsulSettings__HealthCheckGrpcPort: "8082"
+  diadoc-connector:
+    enable_otel: true
+    tcp_port: 6900:8081
+    grpc_port: 6901:8082
+    environment:
+      GRPC_DNS_RESOLVER: native
+      ConsulSettings__ConsulEndpoint: http://consul-agent:8500
+      ConsulSettings__ServiceHost: "{{ target_server_name }}"
+      ConsulSettings__ConfigPrefix: "{{ consul_env_path }}/{{ data_center }}"
+      ConsulSettings__ServiceName: "{{ service_name }}"
+      ConsulSettings__SettingsName: "{{ service_version }}/settings.{{ service_config_version }}"
+      ConsulSettings__ServicePrefix: "{{ consul_env_code }}"
+      ConsulSettings__ServiceIdSuffix: "{{ target_server_name }}"
+      ConsulSettings__HealthCheckServiceHost: "{{ service_name }}"
+      ConsulSettings__HttpPort: "6900"
+      ConsulSettings__GrpcPort: "6901"
+      ConsulSettings__HealthCheckHttpPort: "8081"
+      ConsulSettings__HealthCheckGrpcPort: "8082"
+      CRYPTO_PRO_LICENSE_KEY: "{{ crypto_pro_key[target_server_name].crypto_pro_key | default(omit) }}"
+
+  scoring:
+    enable_otel: true
+    tcp_port: 6984:8081
+    grpc_port: 6985:8082
+    environment:
+      GRPC_DNS_RESOLVER: native
+      ConsulSettings__ConsulEndpoint: http://consul-agent:8500
+      ConsulSettings__ServiceHost: "{{ target_server_name }}"
+      ConsulSettings__ServiceName: "{{ service_name }}"
+      ConsulSettings__SettingsName: "{{ service_version }}/settings.{{ service_config_version }}"
+      ConsulSettings__ServicePrefix: "{{ consul_env_code }}"
+      ConsulSettings__ServiceIdSuffix: "{{ target_server_name }}"
+      ConsulSettings__ConfigPrefix: "{{ consul_env_path }}/{{ data_center }}"
+      ConsulSettings__HealthCheckServiceHost: "{{ service_name }}"
+      ConsulSettings__HttpPort: "6984"
+      ConsulSettings__GrpcPort: "6985"
+      ConsulSettings__HealthCheckHttpPort: "8081"
+      ConsulSettings__HealthCheckGrpcPort: "8082"      
+  firm-business:
+    enable_otel: true
+    tcp_port: 5241:8081 #HTTP/1
+    environment:
+      GRPC_DNS_RESOLVER: native
+      ASPNETCORE_ENVIRONMENT: Production
+      ConsulSettings__ConsulEndpoint: http://consul-agent:8500
+      ConsulSettings__ServiceHost: "{{ target_server_name }}"
+      ConsulSettings__ConfigPrefix: "{{ consul_env_path }}/{{ data_center }}"
+      ConsulSettings__ServiceName: "{{ service_name }}"
+      ConsulSettings__SettingsName: "{{ service_version }}/settings.{{ service_config_version }}"
+      ConsulSettings__ServicePrefix: "{{ consul_env_code }}"
+      ConsulSettings__ServiceIdSuffix: "{{ target_server_name }}"
+      ConsulSettings__HealthCheckServiceHost: "{{ service_name }}"
+      ConsulSettings__HttpPort: "5241"
+      ConsulSettings__HealthCheckHttpPort: "8081"
+    vol:
+      - "/mnt/firm-business-apk/:/app/Update/"
+  edox-office:
+    tcp_port: 5025:8081 #HTTP/1
+    grpc_port: 7025:8082 #У сервиса нет GRPC порта, данный порт HTTP/2
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      GRPC_DNS_RESOLVER: native
+      ConsulSettings__ConsulEndpoint: http://consul-agent:8500
+      ConsulSettings__ServiceHost: "{{ target_server_name }}"
+      ConsulSettings__ConfigPrefix: "{{ consul_env_path }}/{{ data_center }}"
+      ConsulSettings__ServiceName: "{{ service_name }}"
+      ConsulSettings__SettingsName: "{{ service_version }}/settings.{{ service_config_version }}"
+      ConsulSettings__ServicePrefix: "{{ consul_env_code }}"
+      ConsulSettings__ServiceIdSuffix: "{{ target_server_name }}"
+      ConsulSettings__HealthCheckServiceHost: "{{ service_name }}"
+      ConsulSettings__HttpPort: "5025"
+      ConsulSettings__HealthCheckHttpPort: "8081"
+      
+  edox-office-webapi:
+    enable_otel: true
+    tcp_port: 8091:8091 #HTTP/1
+    grpc_port: 8083:8082
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      GRPC_DNS_RESOLVER: native
+      ConsulSettings__ConsulEndpoint: http://consul-agent:8500
+      ConsulSettings__ServiceHost: "{{ target_server_name }}"
+      ConsulSettings__ConfigPrefix: "{{ consul_env_path }}/{{ data_center }}"
+      ConsulSettings__ServiceName: "{{ service_name }}"
+      ConsulSettings__SettingsName: "{{ service_version }}/settings.{{ service_config_version }}"
+      ConsulSettings__ServicePrefix: "{{ consul_env_code }}"
+      ConsulSettings__ServiceIdSuffix: "{{ target_server_name }}"
+      ConsulSettings__HealthCheckServiceHost: "{{ service_name }}"
+      ConsulSettings__HttpPort: "8091"
+      ConsulSettings__HealthCheckHttpPort: "8091"
+      
+  passport-recognizer:
+    enable_otel: true
+    tcp_port: 4398:8081
+    grpc_port: 15002:8082
+    environment:
+      GRPC_DNS_RESOLVER: native
+      ConsulSettings__ConsulEndpoint: http://consul-agent:8500
+      ConsulSettings__ServiceHost: "{{ target_server_name }}"
+      ConsulSettings__ConfigPrefix: "{{ consul_env_path }}/{{ data_center }}"
+      ConsulSettings__ServiceName: "{{ service_name }}"
+      ConsulSettings__SettingsName: "{{ service_version }}/settings.{{ service_config_version }}"
+      ConsulSettings__ServicePrefix: "{{ consul_env_code }}"
+      ConsulSettings__ServiceIdSuffix: "{{ target_server_name }}"
+      ConsulSettings__HealthCheckServiceHost: "{{ service_name }}"
+      ConsulSettings__HttpPort: "4398"
+      ConsulSettings__GrpcPort: "15002"
+      ConsulSettings__HealthCheckHttpPort: "8081"
+      ConsulSettings__HealthCheckGrpcPort: "8082"
+  tsp-connector:
+    enable_otel: true
+    tcp_port: 9854:8081
+    grpc_port: 9856:8082
+    environment:
+      GRPC_DNS_RESOLVER: native
+      ConsulSettings__ConsulEndpoint: http://consul-agent:8500
+      ConsulSettings__ServiceHost: "{{ target_server_name }}"
+      ConsulSettings__ConfigPrefix: "{{ consul_env_path }}/{{ data_center }}"
+      ConsulSettings__ServiceName: "{{ service_name }}"
+      ConsulSettings__SettingsName: "{{ service_version }}/settings.{{ service_config_version }}"
+      ConsulSettings__ServicePrefix: "{{ consul_env_code }}"
+      ConsulSettings__ServiceIdSuffix: "{{ target_server_name }}"
+      ConsulSettings__HealthCheckServiceHost: "{{ service_name }}"
+      ConsulSettings__HttpPort: "9854"
+      ConsulSettings__GrpcPort: "9856"
+      ConsulSettings__HealthCheckHttpPort: "8081"
+      ConsulSettings__HealthCheckGrpcPort: "8082"
+      ApplicationSettings__CertificatePrimaryPath: /app/CustomCertificates/cert_tsa-enotary.cer
+      ApplicationSettings__CertificateIntermediatePath: /app/CustomCertificates/subca_iit_2023.cer
+      ApplicationSettings__CertificateTrustedPath: /app/CustomCertificates/root_mcs_2022.cer
+    vol: /opt/CustomCertificates/tsp-connector/:/app/CustomCertificates/ #Для данной переменной в таске установлен default(omit), что бы не пихать эту переменную в остальные сервисы, переменная будет проигнорирована, если она не задана
+  raif-connector:
+    enable_otel: true
+    tcp_port: 26900:8081
+    grpc_port: 26901:8082
+    environment:
+      GRPC_DNS_RESOLVER: native
+      ConsulSettings__ConsulEndpoint: http://consul-agent:8500
+      ConsulSettings__ServiceHost: "{{ target_server_name }}"
+      ConsulSettings__ConfigPrefix: "{{ consul_env_path }}/{{ data_center }}"
+      ConsulSettings__ServiceName: "{{ service_name }}"
+      ConsulSettings__SettingsName: "{{ service_version }}/settings.{{ service_config_version }}"
+      ConsulSettings__ServicePrefix: "{{ consul_env_code }}"
+      ConsulSettings__ServiceIdSuffix: "{{ target_server_name }}"
+      ConsulSettings__HealthCheckServiceHost: "{{ service_name }}"
+      ConsulSettings__HealthCheckHttpPort: "8081"
+      ConsulSettings__HealthCheckGrpcPort: "8082"
+      ConsulSettings__HttpPort: "26900"
+      ConsulSettings__GrpcPort: "26901"
+    vol:
+      - "/mnt/raif-connector_cache:/app/cache-files"
+  kafka-connector:
+    enable_otel: true
+    tcp_port: 26910:8081 #HTTP/1
+    environment:
+      GRPC_DNS_RESOLVER: native
+      ConsulSettings__ConsulEndpoint: http://consul-agent:8500
+      ConsulSettings__ServiceHost: "{{ target_server_name }}"
+      ConsulSettings__ConfigPrefix: "{{ consul_env_path }}/{{ data_center }}"
+      ConsulSettings__ServiceName: "{{ service_name }}"
+      ConsulSettings__SettingsName: "{{ service_version }}/settings.{{ service_config_version }}"
+      ConsulSettings__ServicePrefix: "{{ consul_env_code }}"
+      ConsulSettings__ServiceIdSuffix: "{{ target_server_name }}"
+      ConsulSettings__HealthCheckServiceHost: "{{ service_name }}"
+      ConsulSettings__HttpPort: "26910"
+      ConsulSettings__HealthCheckHttpPort: "8081"
+  hashing:
+    enable_otel: true
+    tcp_port: 27060:8081
+    grpc_port: 27061:8082
+    environment:
+      GRPC_DNS_RESOLVER: native
+      ConsulSettings__ConsulEndpoint: http://consul-agent:8500
+      ConsulSettings__ServiceHost: "{{ target_server_name }}"
+      ConsulSettings__ConfigPrefix: "{{ consul_env_path }}/{{ data_center }}"
+      ConsulSettings__ServiceName: "{{ service_name }}"
+      ConsulSettings__SettingsName: "{{ service_version }}/settings.{{ service_config_version }}"
+      ConsulSettings__ServicePrefix: "{{ consul_env_code }}"
+      ConsulSettings__ServiceIdSuffix: "{{ target_server_name }}"
+      ConsulSettings__HealthCheckServiceHost: "{{ service_name }}"
+      ConsulSettings__HttpPort: "27060"
+      ConsulSettings__GrpcPort: "27061"
+      ConsulSettings__HealthCheckHttpPort: "8081"
+      ConsulSettings__HealthCheckGrpcPort: "8082"
+  message-proxy:
+    enable_otel: true
+    tcp_port: 12567:8081
+    grpc_port: 12568:8082
+    environment:
+      GRPC_DNS_RESOLVER: native
+      ConsulSettings__ConsulEndpoint: http://consul-agent:8500
+      ConsulSettings__ServiceHost: "{{ target_server_name }}"
+      ConsulSettings__ConfigPrefix: "{{ consul_env_path }}/{{ data_center }}"
+      ConsulSettings__ServiceName: "{{ service_name }}"
+      ConsulSettings__SettingsName: "{{ service_version }}/settings.{{ service_config_version }}"
+      ConsulSettings__ServicePrefix: "{{ consul_env_code }}"
+      ConsulSettings__ServiceIdSuffix: "{{ target_server_name }}"
+      ConsulSettings__HealthCheckServiceHost: "{{ service_name }}"
+      ConsulSettings__HealthCheckHttpPort: "8081"
+      ConsulSettings__HealthCheckGrpcPort: "8082"
+      ConsulSettings__HttpPort: "12567"
+      ConsulSettings__GrpcPort: "12568"
+  message-proxy-control-panel:
+    enable_otel: true
+    tcp_port: 12781:8081
+    grpc_port: 12782:8082
+    environment:
+      GRPC_DNS_RESOLVER: native
+      ConsulSettings__ConsulEndpoint: http://consul-agent:8500
+      ConsulSettings__ServiceHost: "{{ target_server_name }}"
+      ConsulSettings__ConfigPrefix: "{{ consul_env_path }}/{{ data_center }}"
+      ConsulSettings__ServiceName: "{{ service_name }}"
+      ConsulSettings__SettingsName: "{{ service_version }}/settings.{{ service_config_version }}"
+      ConsulSettings__ServicePrefix: "{{ consul_env_code }}"
+      ConsulSettings__ServiceIdSuffix: "{{ target_server_name }}"
+      ConsulSettings__HealthCheckServiceHost: "{{ service_name }}"
+      ConsulSettings__HttpPort: "12781"
+      ConsulSettings__GrpcPort: "12782"
+      ConsulSettings__HealthCheckHttpPort: "8081"
+      ConsulSettings__HealthCheckGrpcPort: "8082"
+  moex-loaders:
+    enable_otel: true
+    tcp_port: 7010:8081
+    grpc_port: 7011:8082
+    environment:
+      GRPC_DNS_RESOLVER: native
+      ConsulSettings__ConsulEndpoint: http://consul-agent:8500
+      ConsulSettings__ServiceHost: "{{ target_server_name }}"
+      ConsulSettings__ConfigPrefix: "{{ consul_env_path }}/{{ data_center }}"
+      ConsulSettings__ServiceName: "{{ service_name }}"
+      ConsulSettings__SettingsName: "{{ service_version }}/settings.{{ service_config_version }}"
+      ConsulSettings__ServicePrefix: "{{ consul_env_code }}"
+      ConsulSettings__ServiceIdSuffix: "{{ target_server_name }}"
+      ConsulSettings__HealthCheckServiceHost: "{{ service_name }}"
+      ConsulSettings__HttpPort: "7010"
+      ConsulSettings__GrpcPort: "7011"
+      ConsulSettings__HealthCheckHttpPort: "8081"
+      ConsulSettings__HealthCheckGrpcPort: "8082"
+  file-accessor:
+    enable_otel: true
+    tcp_port: 6910:8081
+    grpc_port: 6911:8082
+    environment:
+      ApplicationSettings__FileShareFolder: /mnt/edox-file-share
+      GRPC_DNS_RESOLVER: native
+      ConsulSettings__ConsulEndpoint: http://consul-agent:8500
+      ConsulSettings__ServiceHost: "{{ target_server_name }}"
+      ConsulSettings__ConfigPrefix: "{{ consul_env_path }}/{{ data_center }}"
+      ConsulSettings__ServiceName: "{{ service_name }}"
+      ConsulSettings__SettingsName: "{{ service_version }}/settings.{{ service_config_version }}"
+      ConsulSettings__ServicePrefix: "{{ consul_env_code }}"
+      ConsulSettings__ServiceIdSuffix: "{{ target_server_name }}"
+      ConsulSettings__HealthCheckServiceHost: "{{ service_name }}"
+      ConsulSettings__HttpPort: "6910"
+      ConsulSettings__GrpcPort: "6911"
+      ConsulSettings__HealthCheckHttpPort: "8081"
+      ConsulSettings__HealthCheckGrpcPort: "8082"
+    vol: /mnt/edox-file-accessor:/mnt/edox-file-share #Для данной переменной в таске установлен default(omit), что бы не пихать эту переменную в остальные сервисы, переменная будет проигнорирована, если она не задана
+  report-converter:
+    enable_otel: true
+    tcp_port: 6920:8081
+    grpc_port: 6921:8082
+    environment:
+      GRPC_DNS_RESOLVER: native
+      ConsulSettings__ConsulEndpoint: http://consul-agent:8500
+      ConsulSettings__ServiceHost: "{{ target_server_name }}"
+      ConsulSettings__ConfigPrefix: "{{ consul_env_path }}/{{ data_center }}"
+      ConsulSettings__ServiceName: "{{ service_name }}"
+      ConsulSettings__SettingsName: "{{ service_version }}/settings.{{ service_config_version }}"
+      ConsulSettings__ServicePrefix: "{{ consul_env_code }}"
+      ConsulSettings__ServiceIdSuffix: "{{ target_server_name }}"
+      ConsulSettings__HealthCheckServiceHost: "{{ service_name }}"
+      ConsulSettings__HttpPort: "6920"
+      ConsulSettings__GrpcPort: "6921"
+      ConsulSettings__HealthCheckHttpPort: "8081"
+      ConsulSettings__HealthCheckGrpcPort: "8082"
+  signer:
+    enable_otel: true
+    tcp_port: 2329:8081
+    grpc_port: 2330:8082
+    environment:
+      CRYPTO_PRO_KEY: "{{ crypto_pro_key[target_server_name].crypto_pro_key | default(omit) }}"
+      GRPC_DNS_RESOLVER: native
+      ConsulSettings__ConsulEndpoint: http://consul-agent:8500
+      ConsulSettings__ServiceHost: "{{ target_server_name }}"
+      ConsulSettings__ConfigPrefix: "{{ consul_env_path }}/{{ data_center }}"
+      ConsulSettings__ServiceName: "{{ service_name }}"
+      ConsulSettings__SettingsName: "{{ service_version }}/settings.{{ service_config_version }}"
+      ConsulSettings__ServicePrefix: "{{ consul_env_code }}"
+      ConsulSettings__ServiceIdSuffix: "{{ target_server_name }}"
+      ConsulSettings__HealthCheckServiceHost: "{{ service_name }}"
+      ConsulSettings__HttpPort: "2329"
+      ConsulSettings__GrpcPort: "2330"
+      ConsulSettings__HealthCheckHttpPort: "8081"
+      ConsulSettings__HealthCheckGrpcPort: "8082"
+      SignerSettings__RootCertificatesPath: /app/custrom-root-certificates/Root/
+      SignerSettings__CACertificatesPath: /app/custrom-root-certificates/CA/
+    vol: /opt/CustomCertificates/signer/:/app/custrom-root-certificates/ #Для данной переменной в таске установлен default(omit), что бы не пихать эту переменную в остальные сервисы, переменная будет проигнорирована, если она не задана
+  signer-proxy:
+    special_image: edoxauto-docker-local.artifact.firm.ru/signer:{{ service_version }}
+    tcp_port: 2331:8081
+    grpc_port: 2332:8082
+    environment:
+      GRPC_DNS_RESOLVER: native
+      ConsulSettings__ConsulEndpoint: http://consul-agent:8500
+      ConsulSettings__ServiceHost: "{{ target_server_name }}"
+      ConsulSettings__ConfigPrefix: "{{ consul_env_path }}/{{ data_center }}"
+      ConsulSettings__ServiceName: "{{ service_name }}"
+      ConsulSettings__SettingsName: "{{ service_version }}/settings.{{ service_config_version }}"
+      ConsulSettings__ServicePrefix: "{{ consul_env_code }}"
+      ConsulSettings__ServiceIdSuffix: "{{ target_server_name }}"
+      SignerSettings__RootCertificatesPath: /app/custrom-root-certificates/Root/
+      SignerSettings__CACertificatesPath: /app/custrom-root-certificates/CA/
+      ConsulSettings__HealthCheckServiceHost: "{{ service_name }}"
+      ConsulSettings__HttpPort: "2331"
+      ConsulSettings__GrpcPort: "2332"
+      ConsulSettings__HealthCheckHttpPort: "8081"
+      ConsulSettings__HealthCheckGrpcPort: "8082"
+    vol: /opt/CustomCertificates/signer/:/app/custrom-root-certificates/ #Для данной переменной в таске установлен default(omit), что бы не пихать эту переменную в остальные сервисы, переменная будет проигнорирована, если она не задана
+  fssp-connector:
+    enable_otel: true
+    tcp_port: 6950:8081
+    grpc_port: 6951:8082
+    environment:
+      GRPC_DNS_RESOLVER: native
+      ConsulSettings__ConsulEndpoint: http://consul-agent:8500
+      ConsulSettings__ServiceHost: "{{ target_server_name }}"
+      ConsulSettings__ConfigPrefix: "{{ consul_env_path }}/{{ data_center }}"
+      ConsulSettings__ServiceName: "{{ service_name }}"
+      ConsulSettings__SettingsName: "{{ service_version }}/settings.{{ service_config_version }}"
+      ConsulSettings__ServicePrefix: "{{ consul_env_code }}"
+      ConsulSettings__ServiceIdSuffix: "{{ target_server_name }}"
+      ConsulSettings__HealthCheckServiceHost: "{{ service_name }}"
+      ConsulSettings__HealthCheckHttpPort: "8081"
+      ConsulSettings__HealthCheckGrpcPort: "8082"
+      ConsulSettings__HttpPort: "6950"
+      ConsulSettings__GrpcPort: "6951"
+  federal-financial-monitoring:
+    tcp_port: 6960:8081
+    environment:
+      GRPC_DNS_RESOLVER: native
+      ConsulSettings__ConsulEndpoint: http://consul-agent:8500
+      ConsulSettings__ServiceHost: "{{ target_server_name }}"
+      ConsulSettings__ConfigPrefix: "{{ consul_env_path }}/{{ data_center }}"
+      ConsulSettings__ServiceName: "{{ service_name }}"
+      ConsulSettings__SettingsName: "{{ service_version }}/settings.{{ service_config_version }}"
+      ConsulSettings__ServicePrefix: "{{ consul_env_code }}"
+      ConsulSettings__ServiceIdSuffix: "{{ target_server_name }}"
+      ConsulSettings__HealthCheckServiceHost: "{{ service_name }}"
+      ConsulSettings__HttpPort: "6960"
+      ConsulSettings__HealthCheckHttpPort: "8081"
+  preliminary-order:
+    tcp_port: 6988:8081
+    environment:
+      GRPC_DNS_RESOLVER: native
+      ConsulSettings__ConsulEndpoint: http://consul-agent:8500
+      ConsulSettings__ServiceHost: "{{ target_server_name }}"
+      ConsulSettings__ConfigPrefix: "{{ consul_env_path }}/{{ data_center }}"
+      ConsulSettings__ServiceName: "{{ service_name }}"
+      ConsulSettings__SettingsName: "{{ service_version }}/settings.{{ service_config_version }}"
+      ConsulSettings__ServicePrefix: "{{ consul_env_code }}"
+      ConsulSettings__ServiceIdSuffix: "{{ target_server_name }}"
+      ConsulSettings__HealthCheckServiceHost: "{{ service_name }}"
+      ConsulSettings__HttpPort: "6988"
+      ConsulSettings__HealthCheckHttpPort: "8081"
+  prop-connector:
+    tcp_port: 6980:8081
+    grpc_port: 6981:8082
+    environment:
+      GRPC_DNS_RESOLVER: native
+      ConsulSettings__ConsulEndpoint: http://consul-agent:8500
+      ConsulSettings__ServiceHost: "{{ target_server_name }}"
+      ConsulSettings__ServiceName: "{{ service_name }}"
+      ConsulSettings__SettingsName: "{{ service_version }}/settings.{{ service_config_version }}"
+      ConsulSettings__ServicePrefix: "{{ consul_env_code }}"
+      ConsulSettings__ServiceIdSuffix: "{{ target_server_name }}"
+      ConsulSettings__ConfigPrefix: "{{ consul_env_path }}/{{ data_center }}"
+      ConsulSettings__HealthCheckServiceHost: "{{ service_name }}"
+      ConsulSettings__HttpPort: "6980"
+      ConsulSettings__GrpcPort: "6981"
+      ConsulSettings__HealthCheckHttpPort: "8081"
+      ConsulSettings__HealthCheckGrpcPort: "8082"
+  prop-trading:
+    enable_otel: true
+    tcp_port: 6982:8081
+    grpc_port: 6983:8082
+    environment:
+      GRPC_DNS_RESOLVER: native
+      ConsulSettings__ConsulEndpoint: http://consul-agent:8500
+      ConsulSettings__ServiceHost: "{{ target_server_name }}"
+      ConsulSettings__ServiceName: "{{ service_name }}"
+      ConsulSettings__SettingsName: "{{ service_version }}/settings.{{ service_config_version }}"
+      ConsulSettings__ServicePrefix: "{{ consul_env_code }}"
+      ConsulSettings__ServiceIdSuffix: "{{ target_server_name }}"
+      ConsulSettings__ConfigPrefix: "{{ consul_env_path }}/{{ data_center }}"
+      ConsulSettings__HealthCheckServiceHost: "{{ service_name }}"
+      ConsulSettings__HttpPort: "6982"
+      ConsulSettings__GrpcPort: "6983"
+      ConsulSettings__HealthCheckHttpPort: "8081"
+      ConsulSettings__HealthCheckGrpcPort: "8082"  
+  digital-profile:
+    enable_otel: true
+    tcp_port: 17400:8081
+    grpc_port: 17401:8082
+    environment:
+      GRPC_DNS_RESOLVER: native
+      ConsulSettings__ConsulEndpoint: http://consul-agent:8500
+      ConsulSettings__ServiceHost: "{{ target_server_name }}"
+      ConsulSettings__ConfigPrefix: "{{ consul_env_path }}/{{ data_center }}"
+      ConsulSettings__ServiceName: "{{ service_name }}"
+      ConsulSettings__SettingsName: "{{ service_version }}/settings.{{ service_config_version }}"
+      ConsulSettings__ServicePrefix: "{{ consul_env_code }}"
+      ConsulSettings__ServiceIdSuffix: "{{ target_server_name }}"
+      ConsulSettings__HealthCheckServiceHost: "{{ service_name }}"
+      ConsulSettings__HttpPort: "17400"
+      ConsulSettings__GrpcPort: "17401"
+      ConsulSettings__HealthCheckHttpPort: "8081"
+      ConsulSettings__HealthCheckGrpcPort: "8082"
+  tnved:
+    enable_otel: true
+    tcp_port: 6986:8081
+    grpc_port: 6987:8082
+    environment:
+      GRPC_DNS_RESOLVER: native
+      ConsulSettings__ConsulEndpoint: http://consul-agent:8500
+      ConsulSettings__ServiceHost: "{{ target_server_name }}"
+      ConsulSettings__ConfigPrefix: "{{ consul_env_path }}/{{ data_center }}"
+      ConsulSettings__ServiceName: "{{ service_name }}"
+      ConsulSettings__SettingsName: "{{ service_version }}/settings.{{ service_config_version }}"
+      ConsulSettings__ServicePrefix: "{{ consul_env_code }}"
+      ConsulSettings__ServiceIdSuffix: "{{ target_server_name }}"
+      ConsulSettings__HealthCheckServiceHost: "{{ service_name }}"
+      ConsulSettings__HttpPort: "6986"
+      ConsulSettings__GrpcPort: "6987"
+      ConsulSettings__HealthCheckHttpPort: "8081"
+      ConsulSettings__HealthCheckGrpcPort: "8082"
+      
+  smev4:
+    special_image: einfahrt:latest
+    tcp_port:
+      - 8183:8183
+      - 8192:8192
+      - 8171:8171
+      - 8172:8172
+      - 8381:8381
+    vol:
+      - /opt/CustomCertificates/smev4/keys:/var/opt/cprocsp/keys/app
+      - /opt/CustomCertificates/smev4/application.yml.j2:/egov/java/application.yml
+      - /opt/CustomCertificates/smev4/licenses/csp.lic:/egov/csp.lic
+    extra_hosts:
+      - "podd1.gosuslugi.ru:109.207.15.26"
+      - "podd2.gosuslugi.ru:109.207.15.58"
+      - "podd3.gosuslugi.ru:109.207.15.154"
+      - "podd4.gosuslugi.ru:109.207.15.186"
+      - "podd-cross.gosuslugi.ru:172.20.59.5"
+      - "podd1-cross.gosuslugi.ru:109.207.15.26"
+      - "podd2-cross.gosuslugi.ru:109.207.15.58"
+      - "podd3-cross.gosuslugi.ru:109.207.15.154"
+      - "podd4-cross.gosuslugi.ru:109.207.15.186"
+      - "podd.gosuslugi.ru:172.20.59.5"
+

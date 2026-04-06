@@ -1,0 +1,5 @@
+﻿- name: Deploy application
+  hosts: localhost
+  gather_facts: no
+  roles:
+    - deploy

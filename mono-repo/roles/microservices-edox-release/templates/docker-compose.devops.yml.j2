@@ -1,0 +1,28 @@
+﻿version: '3.7'
+
+services:
+  {{ service_name }}:
+    cpu_count: {{ edox_services[service_name]['cpu'] | default(2) }}
+    cpu_percent: 50
+    mem_limit: {{ edox_services[service_name]['memory'] | default('1g') }}
+    restart: unless-stopped
+    logging:
+      driver: {{ docker_logging_driver }}
+      options:
+        syslog-address: "{{ docker_syslog_address }}"
+        tag: "{{ docker_logging_tag }}"
+
+{% if edox_services[service_name]['volumes'] is defined %}
+    volumes:
+      - {{ volume }}
+{% endif %}
+    environment:
+{% for env_variable in edox_services[service_name]['env'] %}
+      - {{ env_variable }}={{ edox_services[service_name]['env'][env_variable] }}
+{% endfor %}
+
+networks:
+  default:
+    external:
+      name: edox
+

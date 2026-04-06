@@ -1,0 +1,19 @@
+﻿- name: Creating compose file with description "app" service
+  template: 
+    src: "templates/docker-compose.devops.yml.j2"
+    dest: "{{ devops_compose_files_dir }}/{{ service_name }}/docker-compose.devops.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: '755'
+  when: (inventory_hostname in groups['application_servers'])
+
+- name: Creating compose file with description "web" service
+  template: 
+    src: "templates/docker-compose-web.devops.yml.j2"
+    dest: "{{ devops_compose_files_dir }}/{{ service_name }}/docker-compose.devops.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: '755'
+  when: (inventory_hostname in groups['web_servers'])
+
+

@@ -1,0 +1,223 @@
+﻿- name: Импортируем чувствительные переменные из Vault
+  block:
+    - name: Читаем Vault токен
+      become: true
+      slurp:
+        src: "/opt/{{ vault_agent_name_directory }}/.token_unwrapped"
+      register: vault_token
+
+    - name: Получаем секреты из Vault
+      set_fact:
+        vault_secrets: "{{ lookup('community.hashi_vault.hashi_vault',
+                                  vault_ansible_secret_path,
+                                  url=vault_agent_api_url,
+                                  token=(vault_token.content | b64decode)) }}"
+  delegate_to: localhost
+
+- name: Инклюдим переменные из vars
+  ansible.builtin.include_vars:
+    file: "{{ env_code }}.yml"
+
+- block:
+    - name: Проверка наличия уже выполненных скриптов в Consul K/V
+      community.general.consul_kv:
+        host: consul
+        port: 443
+        scheme: https
+        datacenter: "{{ consul_datacenter }}"
+        token: "{{ vault_secrets.consul_token }}"
+        key: "{{ consul_env_path }}/db_scripts_migrations/{{ service_name }}/{{ service_version }}/migration_log"
+        recurse: true
+      delegate_to: localhost
+      register: existing_migrations
+
+    - name: Проливка скриптов миграции в БД Postgresql
+      community.postgresql.postgresql_script:
+        login_host: "{{ services[service_name].postgresql_db_hostname }}"
+        db: "{{ services[service_name].postgresql_db_name }}"
+        port: "{{ services[service_name].postgresql_db_port }}"
+        login_user: "{{ services[service_name].postgresql_db_username_name }}"
+        login_password: "{{ services[service_name].postgresql_db_password_name }}"
+        path: "{{ item }}"
+      delegate_to: localhost
+      loop: "{{ lookup('fileglob', '{{ service_name }}/{{ service_version }}/*.sql', wantlist=True) }}"
+      when: item | basename not in (existing_migrations.data | map(attribute='Key') | map('basename') | list)
+      register: result_migration
+
+    - name: Запись выполненных скриптов в Consul K/V
+      community.general.consul_kv:
+        host: consul
+        port: 443
+        scheme: https
+        datacenter: "{{ consul_datacenter }}"
+        token: "{{ vault_secrets.consul_token }}"
+        key: "{{ consul_env_path }}/db_scripts_migrations/{{ service_name }}/{{ service_version }}/migration_log/{{ item.item | basename }}"
+        value: "{{ item.query }}"
+      delegate_to: localhost
+      when: item.changed
+      loop: "{{ result_migration.results }}"
+  when: consul_datacenter == 'dc-pp'
+
+- name: PUSH consul конфигов сервисов
+  community.general.consul_kv:
+    host: consul
+    port: 443
+    scheme: https
+    datacenter: "{{ consul_datacenter }}"
+    key: "{{ consul_env_path }}/{{ data_center }}/{{ service_name }}/{{ service_version }}/settings.{{ service_config_version }}"
+    value: "{{ lookup('template', 'templates/consul/{{ env_code }}/{{ service_name }}.yml.j2') | string }}"
+    token: "{{ vault_secrets.consul_token }}"
+  delegate_to: localhost
+  when:
+    - service_name != "smev4"
+
+- name: Создаем папки для файлов
+  ansible.builtin.file:
+    path: "{{ item.path_name }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: '755'
+  loop:
+    - path_name: '{{ devops_compose_files_dir }}/{{ service_name }}'
+      condition: 'true'  # Условие выполнения для этого элемента всегда истинно
+    - path_name: '/opt/CustomCertificates/{{ service_name }}/licenses'
+      condition: "{{ service_name == 'smev4' }}"  # Условие специфично для этого элемента
+  when: item.condition
+
+- name: Создаем композ файлы для сервисов
+  template:
+    src: "templates/docker-compose.yml.j2"
+    dest: "{{ devops_compose_files_dir }}/{{ service_name }}/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: '755'
+
+- name: Работаем с template сервисов
+  template:
+    src: "{{ item.src_path }}"
+    dest: "{{ item.dest_path }}"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: '755'
+  loop:
+    - src_path: 'templates/docker-compose.yml.j2'
+      dest_path: '{{ devops_compose_files_dir }}/{{ service_name }}/docker-compose.yml'
+      condition: 'true'  # Условие выполнения для этого элемента всегда истинно
+    - src_path: 'templates/smev4/licenses/csp.yml.j2'
+      dest_path: '/opt/CustomCertificates/{{ service_name }}/licenses/csp.lic'
+      condition: "{{ service_name == 'smev4' }}"  # Условие специфично для этого элемента
+    - src_path: 'templates/smev4/application.yml.j2'
+      dest_path: '/opt/CustomCertificates/{{ service_name }}/application.yml.j2'
+      condition: "{{ service_name == 'smev4' }}"  # Условие специфично для этого элемента
+  when: item.condition
+
+- name: Внешние сертификаты
+  copy:
+    src: "../files/{{ service_name }}/"
+    dest: "/opt/CustomCertificates/{{ service_name }}"
+    mode: '0644'
+  when:
+    - service_name == "tsp-connector" or
+      service_name == "signer" or
+      service_name == "smev4"
+
+- name: Изменение владельца каталога, пока нужно только для smev4
+  ansible.builtin.file:
+    path: /opt/CustomCertificates/{{ service_name }}
+    owner: '1000'
+    group: '1000'
+    mode: '0777'
+    recurse: yes
+    state: directory
+  when:
+    - service_name == "smev4"
+
+- name: Запуск контейнера для hotfix-сервисов
+  community.docker.docker_container:
+    name: "{{ service_name }}"
+    image: "edoxauto-docker-local.artifact.firm.ru/{{ service_name | regex_replace('-hotfix(-)?', '') }}:{{ service_version }}"
+    published_ports:
+      - "{{ services[service_name].tcp_port }}"
+      - "{{ services[service_name].grpc_port }}"
+    restart_policy: unless-stopped
+    cpus: "{{ count_cpu }}"
+    memory: "{{ count_ram }}"
+    log_driver: syslog
+    log_options:
+      tag: "docker/{{ '{{' }}.Name{{ '}}' }}/{{ '{{' }}.Name{{ '}}' }}"
+    oom_killer: false
+    recreate: true
+    env:
+      "{{ services[service_name].environment }}"
+    volumes:
+      "{{ services[service_name].vol | default(omit) }}"
+    networks:
+      - name: skynet
+  when: "'hotfix' in service_name"
+
+  
+- name: Выкачиваем образ, настраиваем и создаем контейнер
+  community.docker.docker_container:
+    name: "{{ service_name }}"
+    image: edoxauto-docker-local.artifact.firm.ru/{{ service_name }}:{{ service_version }}
+    published_ports:
+      - "{{ services[service_name].tcp_port }}"
+      - "{{ services[service_name].grpc_port }}"
+    restart_policy: unless-stopped
+    cpus: "{{ count_cpu }}"
+    memory: "{{ count_ram }}"
+    log_driver: syslog
+    log_options:
+      tag: "docker/{{ '{{' }}.Name{{ '}}' }}/{{ '{{' }}.Name{{ '}}' }}"
+    oom_killer: false
+    recreate: true
+    env:
+      "{{ services[service_name].environment }}"
+    volumes:
+      "{{ services[service_name].vol | default(omit) }}"
+    networks:
+      - name: skynet
+  when:
+    - "'hotfix' not in service_name"
+    - service_name != "file-accessor"
+    - service_name != "federal-financial-monitoring"
+    - service_name != "smev4"
+    - service_name != "signer-proxy"
+    - service_name != "blacklists"
+    - service_name != "blacklists-async"
+    - service_name != "blacklists-loaders"
+    - service_name != "raif-connector"
+    - service_name != "kafka-connector"
+    - service_name != "firm-business" 
+    - service_name != "database-anonymizer"
+    - service_name != "preliminary-order"
+
+- name: Запуск docker-compose файла
+  community.docker.docker_compose_v2:
+    project_src: "/opt/docker/{{ service_name }}"
+    state: present
+  when:
+    - service_name == "file-accessor" or
+      service_name == "federal-financial-monitoring" or
+      service_name == "smev4" or
+      service_name == "signer-proxy"or
+      service_name == "blacklists" or
+      service_name == "blacklists-async" or
+      service_name == "blacklists-loaders" or
+      service_name == "raif-connector" or
+      service_name == "kafka-connector" or
+      service_name == "firm-business" or
+      service_name == "database-anonymizer" or
+      service_name == "preliminary-order"
+
+- name: Останавливаем контейнеры, которые не должны работать параллельно
+  community.docker.docker_container:
+    name: "{{ service_name }}"
+    state: stopped
+  when:
+    - data_center == "msm"
+    - service_name == "kafka-connector" or
+      service_name == "hashing" or
+      service_name == "smev4"
+

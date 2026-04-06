@@ -1,0 +1,84 @@
+﻿- name: Include environment variables
+  ansible.builtin.include_vars:
+    file: "{{ env_code }}.yml"
+
+- name: Include defaults variables
+  ansible.builtin.include_vars:
+    file: defaults/main.yml
+
+- name: Импортируем чувствительные переменные из Vault
+  block:
+    - name: Читаем Vault токен
+      become: true
+      slurp:
+        src: "/opt/{{ vault_agent_name_directory }}/.token_unwrapped"
+      register: vault_token
+
+    - name: Получаем секреты из Vault
+      set_fact:
+        vault_secrets: "{{ lookup('community.hashi_vault.hashi_vault',
+                                  vault_ansible_secret_path,
+                                  url=vault_agent_api_url,
+                                  token=(vault_token.content | b64decode)) }}"
+  delegate_to: localhost
+
+- name: Push config
+  community.general.consul_kv:
+    token: "{{ vault_secrets.consul_token }}"
+    datacenter: "{{ consul_datacenter }}"
+    host: consul
+    port: 443
+    scheme: https
+    key: "{{ consul_env_path }}/{{ service_name }}/{{ service_version }}/appsettings"
+    value: "{{ lookup('ansible.builtin.template', 'templates/consul/{{ env_code }}/{{ service_name }}.yml.j2') }}"
+
+- name: Deploy Secrets
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ vault_secrets.connectionk8s | from_yaml }}"
+    namespace: "{{ vault_secrets.namespacek8s }}"
+    template: ./templates/secrets/secrets-consul-token.yml.j2
+
+- name: Deploy ConfigMap
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ vault_secrets.connectionk8s | from_yaml }}"
+    namespace: "{{ vault_secrets.namespacek8s }}"
+    template: ./templates/configmap/{{ service_name }}.yml.j2
+
+- name: Deploy Service
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ vault_secrets.connectionk8s | from_yaml }}"
+    namespace: "{{ vault_secrets.namespacek8s }}"
+    template: ./templates/service/services.yml.j2
+
+- name: Deploy External Service
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ vault_secrets.connectionk8s | from_yaml }}"
+    namespace: "{{ vault_secrets.namespacek8s }}"
+    template: ./templates/service/external-services.yml.j2
+
+- name: Deploy Service Ingress
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ vault_secrets.connectionk8s | from_yaml }}"
+    namespace: "{{ vault_secrets.namespacek8s }}"
+    template: ./templates/ingress/ingress.yml.j2
+
+- name: Deploy CronJobs
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ vault_secrets.connectionk8s | from_yaml }}"
+    namespace: "{{ vault_secrets.namespacek8s }}"
+    template: ./templates/CronJobs/edox-logins-storage-reinitialize-storage.yml.j2
+  when:
+    - env_code == 'uat'
+
+- name: Deploy Deployment
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ vault_secrets.connectionk8s | from_yaml }}"
+    namespace: "{{ vault_secrets.namespacek8s }}"
+    template: ./templates/deployment/deployment.yml.j2

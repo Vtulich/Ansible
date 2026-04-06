@@ -1,0 +1,92 @@
+﻿default:
+  basic_env:
+    &basic_env
+    GRPC_DNS_RESOLVER: "native"
+    DOTNET_ENVIRONMENT: "{{ dotnet_environment }}"
+    Consul:SettingsKey: "{{ consul_env_path }}/{{ data_center }}/{{ service_name }}/{{ service_version }}/appsettings"
+    Consul:Host: "consul-agent"
+  extendet_env:
+    &extendet_env
+    COMPlus_ThreadPool_ForceMinWorkerThreads: '100'
+    COMPlus_ThreadPool_ForceMaxWorkerThreads: '200'
+    COMPlus_gcConcurrent: '0'
+  web_env:
+    &web_env
+      NODE_ENV: "{{ env_docker }}"
+      ENVIRONMENT: "{{ env_docker }}"
+  web_volumes:
+    &web_volumes
+    volumes:
+      - "{{ devops_compose_files_dir }}/{{ service_name }}/config/js:/app/config/js"
+  otel_env:
+    &otel_env
+    OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+    OTEL_EXPORTER_HEALTHCHECK_ENDPOINT: "http://otel-collector:13133"
+    OTEL_SDK_DISABLED: "false"
+    OTEL_CONSOLE_EXPORTER_DISABLED: "true"
+    OTEL_LOGS_CONSOLE_EXPORTER_DISABLED: "true"
+    OTEL_TRACES_CONSOLE_EXPORTER_DISABLED: "true"
+    OTEL_METRICS_CONSOLE_EXPORTER_DISABLED: "true"
+    OTEL_OTLP_EXPORTER_DISABLED: "false"
+    OTEL_LOGS_OTLP_EXPORTER_DISABLED: "false"
+    OTEL_TRACES_OTLP_EXPORTER_DISABLED: "false"
+    OTEL_METRICS_OTLP_EXPORTER_DISABLED: "false"
+
+
+edox_services: 
+  cc-overdraft:       {ports: ["7701:12300","8801:12301"], env: {<<: *basic_env, <<: *extendet_env, <<: *otel_env} }
+  edox-access:        {ports: ["5555:12300","6614:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-accountform:   {ports: ["5598:12300","6611:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-accounts:      {memory: "15g", ports: ["5558:12300","6606:12301"], env: {<<: *basic_env, <<: *extendet_env, <<: *otel_env} }
+  edox-accounts-datastorage: {memory: "15g", ports: ["5525:12300","6625:12301"], env: {<<: *basic_env, <<: *extendet_env, <<: *otel_env} }
+  edox-address:       {ports: ["5561:12300","6610:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-acquiring:     {ports: ["5538:12300","6638:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-agreements:    {ports: ["5521:12300","6621:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-balance-costs: {ports: ["5523:12300","6623:12301"], env: {<<: *basic_env, <<: *extendet_env, <<: *otel_env} }
+  edox-clientorders:  {ports: ["5535:12300","6635:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-clientdata:    {ports: ["5530:12300","6630:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-confirmation:  {ports: ["5557:12300","6605:12301"], env: {<<: *basic_env, <<: *extendet_env, <<: *otel_env} }
+  edox-crm:           {ports: ["5539:12300","6639:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-dictionary:    {ports: ["5595:12300","6612:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-digitalsales:   {ports: ["5546:12300","6646:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-documents:     {memory: "3g", ports: ["5556:12300","6608:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-dos:           {memory: "2g", ports: ["5563:12300","6609:12301"], env: {<<: *basic_env, <<: *extendet_env, <<: *otel_env} }
+  edox-dos-external:  {ports: ["5543:12300","6643:12301"], env: {<<: *basic_env, <<: *extendet_env, <<: *otel_env} }
+  edox-email:         {ports: ["5577:12300","6613:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-feedback:      {ports: ["5567:12300","6667:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-finances:      {ports: ["5531:12300","6631:12301"], env: {<<: *basic_env, <<: *extendet_env, <<: *otel_env} }
+  edox-imsi:          {ports: ["5515:12300","5580:12300","6615:12301", "6680:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-ipo:           {ports: ["5518:12300","6618:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-journals:      {memory: "1g", ports: ["5519:12300","6619:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-logins-storage: {memory: "15g", ports: ["5536:12300","6636:12301"], env: {<<: *basic_env, <<: *extendet_env, <<: *otel_env} }
+  edox-logins:        {ports: ["5529:12300","6629:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-lk-api:        {ports: ["5548:12300","6648:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-lk-proxy:      {ports: ["6649:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-moneyout:      {ports: ["5588:12300","6688:12301"], env: {<<: *basic_env, <<: *extendet_env, <<: *otel_env} }
+  edox-notices:       {ports: ["5537:12300","6637:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-notification:  {ports: ["5575:12300","6603:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-orders:        {ports: ["5533:12300","6633:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-payment-settings: {ports: ["5550:12300","6650:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-pep:           {ports: ["5532:12300","6632:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-productopening: {ports: ["5547:12300","6647:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-productorder:  {ports: ["5520:12300","6620:12301"], env: {<<: *basic_env, <<: *extendet_env, <<: *otel_env} }
+  edox-products:      {ports: ["5590:12300","6601:12301"], env: {<<: *basic_env, <<: *extendet_env, <<: *otel_env} }
+  edox-publicquestionnaire: {ports: ["5540:12300","5541:12302","6640:12301"], env: {<<: *basic_env, <<: *extendet_env, <<: *otel_env} }
+  edox-questionnaire: {ports: ["5559:12300","6607:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-reports:       {ports: ["5517:12300","6617:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-securities:    {ports: ["5524:12300","6624:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-serviceconfigurations: {ports: ["5582:12300","6682:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-serviceorder:  {ports: ["5584:12300","6684:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-sessions:       {ports: ["5534:12300","6634:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-statements:    {ports: ["5562:12300","6662:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-taxes:         {ports: ["5522:12300","6622:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-tradecontrol:  {ports: ["5551:12300","6651:12301","6652:12302"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-urlshortener:  {ports: ["5545:12300","6645:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-userprofile:   {ports: ["5560:12300","6660:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  edox-yatranslate-proxy: {ports: ["6644:12301"], env: {<<: *basic_env, <<: *otel_env} }
+  id-firm-ru:        {ports: ["1081:80"], env: {<<: *web_env}, <<: *web_volumes }
+  open-firm-ru:      {ports: ["1080:80"], env: {<<: *web_env}, <<: *web_volumes }
+  testing-firm-ru:   {ports: ["1086:80"], env: {<<: *web_env}, <<: *web_volumes }
+  firm-click:   {ports: ["1091:80"], env: {<<: *web_env} }
+  
+

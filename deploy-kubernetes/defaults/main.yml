@@ -1,0 +1,450 @@
+﻿edox_services:
+  cc-overdraft:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 7701
+      - name: http
+        internal: 12301
+        external: 8801
+    cpu: '1000m'
+    memory: '1000Mi'
+  edox-access:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5555
+      - name: http
+        internal: 12301
+        external: 6614
+  edox-accountform:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5598
+      - name: http
+        internal: 12301
+        external: 6611
+    cpu: '1000m'
+  edox-accounts:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5558
+      - name: http
+        internal: 12301
+        external: 6606
+    cpu: '1200m'
+    memory: '700Mi'
+  edox-accounts-datastorage:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5525
+      - name: http
+        internal: 12301
+        external: 6625
+    cpu: '2500m'
+    memory: '1500Mi'
+  edox-address:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5561
+      - name: http
+        internal: 12301
+        external: 6610
+    cpu: '550m'
+  edox-acquiring:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5538
+      - name: http
+        internal: 12301
+        external: 6638
+    cpu: '650m'
+  edox-agreements:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5521
+      - name: http
+        internal: 12301
+        external: 6621
+  edox-balance-costs:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5523
+      - name: http
+        internal: 12301
+        external: 6623
+    cpu: '600m'
+  edox-clientorders:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5535
+      - name: http
+        internal: 12301
+        external: 6635
+  edox-clientdata:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5530
+      - name: http
+        internal: 12301
+        external: 6630
+  edox-confirmation:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5557
+      - name: http
+        internal: 12301
+        external: 6605
+    memory: '600Mi'
+  edox-crm:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5539
+      - name: http
+        internal: 12301
+        external: 6639
+  edox-dictionary:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5595
+      - name: http
+        internal: 12301
+        external: 6612
+    cpu: '650m'
+    memory: '900Mi'
+  edox-digitalsales:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5546
+      - name: http
+        internal: 12301
+        external: 6646
+  edox-documents:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5556
+      - name: http
+        internal: 12301
+        external: 6608
+    cpu: '1800m'
+    memory: '800Mi'
+  edox-dos:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5563
+      - name: http
+        internal: 12301
+        external: 6609
+    cpu: '1000m'
+    memory: '800Mi'
+  edox-dos-external:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5543
+      - name: http
+        internal: 12301
+        external: 6643
+    memory: '1000Mi'
+  edox-email:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5577
+      - name: http
+        internal: 12301
+        external: 6613
+  edox-feedback:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5567
+      - name: http
+        internal: 12301
+        external: 6667
+    cpu: '1100m'
+  edox-finances:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5531
+      - name: http
+        internal: 12301
+        external: 6631
+    memory: '1100Mi'
+    count_replicas: 1
+  edox-imsi:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5515
+      - name: http
+        internal: 12301
+        external: 6615
+  edox-ipo:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5518
+      - name: http
+        internal: 12301
+        external: 6618
+    cpu: '1200m'
+    memory: '1500Mi'
+    count_replicas: 1
+  edox-journals:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5519
+      - name: http
+        internal: 12301
+        external: 6619
+    cpu: '1100m'
+  edox-logins:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5529
+      - name: http
+        internal: 12301
+        external: 6629
+    cpu: '2000m'
+    memory: '650Mi'
+  edox-logins-storage:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5536
+      - name: http
+        internal: 12301
+        external: 6636
+    cpu: '1500m'
+    memory: '900Mi'
+    count_replicas: 1
+  edox-lk-api:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5548
+      - name: http
+        internal: 12301
+        external: 6648
+    cpu: '1200m'
+    memory: '1200Mi'
+  edox-lk-proxy:
+    ports:
+      - name: http
+        internal: 12301
+        external: 6649
+    cpu: '1000m'
+  edox-moneyout:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5588
+      - name: http
+        internal: 12301
+        external: 6688
+    cpu: '650m'
+  edox-notices:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5537
+      - name: http
+        internal: 12301
+        external: 6637
+  edox-notification:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5575
+      - name: http
+        internal: 12301
+        external: 6603
+    cpu: '600m'
+  edox-orders:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5533
+      - name: http
+        internal: 12301
+        external: 6633
+  edox-payment-settings:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5550
+      - name: http
+        internal: 12301
+        external: 6650
+    cpu: '650m'
+  edox-pep:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5532
+      - name: http
+        internal: 12301
+        external: 6632
+  edox-productopening:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5547
+      - name: http
+        internal: 12301
+        external: 6647
+    cpu: '1000m'
+  edox-productorder:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5520
+      - name: http
+        internal: 12301
+        external: 6620
+  edox-products:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5590
+      - name: http
+        internal: 12301
+        external: 6601
+    memory: '500Mi'
+  edox-publicquestionnaire:
+    ports:
+      - name: grpc
+        internal: 12302
+        external: 5541
+      - name: http
+        internal: 12301
+        external: 6640
+      - name: additional-grpc
+        internal: 12300
+        external: 5540
+  edox-questionnaire:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5559
+      - name: http
+        internal: 12301
+        external: 6607
+    cpu: '800m'
+  edox-reports:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5517
+      - name: http
+        internal: 12301
+        external: 6617
+    cpu: '650m'
+  edox-securities:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5524
+      - name: http
+        internal: 12301
+        external: 6624
+    cpu: '1100m'
+    memory: '1200Mi'
+  edox-serviceconfigurations:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5582
+      - name: http
+        internal: 12301
+        external: 6682
+    cpu: '1100m'
+  edox-serviceorder:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5584
+      - name: http
+        internal: 12301
+        external: 6684
+    cpu: '1100m'
+  edox-sessions:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5534
+      - name: http
+        internal: 12301
+        external: 6634
+    cpu: '650m'
+  edox-statements:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5562
+      - name: http
+        internal: 12301
+        external: 6662
+  edox-taxes:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5522
+      - name: http
+        internal: 12301
+        external: 6622
+    cpu: '800m'
+  edox-tradecontrol:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5551
+      - name: http
+        internal: 12301
+        external: 6651
+      - name: http1
+        internal: 12302
+        external: 6652
+  edox-urlshortener:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5545
+      - name: http
+        internal: 12301
+        external: 6645
+    cpu: '800m'
+  edox-userprofile:
+    ports:
+      - name: grpc
+        internal: 12300
+        external: 5560
+      - name: http
+        internal: 12301
+        external: 6660
+    cpu: '1500m'
+    memory: '700Mi'
+  edox-yatranslate-proxy:
+    ports:
+      - name: http
+        internal: 12301
+        external: 6644

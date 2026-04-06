@@ -1,0 +1,941 @@
+﻿edox_services:
+
+  blacklists:
+    ports:
+      grpc: { internal: 8082, external: 16901 }
+      http: { internal: 8081, external: 16900 }
+    ingress_hostname: "{{ balancer_url_k8s }}"
+    ingress_paths:
+      - path: /api/BlackLists/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 16900
+      - path: /api/v1/BlackLists/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 16900
+
+  blacklists-async:
+    ports:
+      http: { internal: 8081, external: 26920 }
+
+  blacklists-loaders:
+    ports:
+      grpc: { internal: 8082, external: 6561 }
+      http: { internal: 8081, external: 6560 }
+    cpu: '1000m'
+    memory: '1500Mi'
+    ingress_hostname: "{{ balancer_url_k8s }}"
+    ingress_paths:
+      - path: /api/v1/BlackListsLoadersBankrupts/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 6560
+      - path: /api/v1/Fedresurs/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 6560
+      - path: /api/v1/Fts/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 6560
+      - path: /api/v1/MinJust/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 6560
+      - path: /api/v1/FileLists/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 6560
+      - path: /api/v1/Fincert/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 6560
+
+  certificates-manager-one:
+    special_image: edoxauto-docker-local.artifact.firm.ru/certificates-manager:{{ service_version }}
+    count_replicas: 1
+    k8s_service_name: certificates-manager
+    k8s_selector_label: certificates-manager
+    consul_template: certificates-manager
+    consul_service_name: certificates-manager
+    consul_service_id_suffix: one
+    certificate_manager_cron: "{{ certificate_manager_cron_one }}"
+    ports:
+      grpc: { internal: 8082, external: 6941 }
+      http: { internal: 8081, external: 6940 }
+    cpu: '800m'
+    memory: '2500Mi'
+    ingress_hostname: "{{ balancer_url_k8s }}"
+    ingress_paths:
+      - path: /api/v1/CertificatesManager/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 6940
+      - path: /grpc.edoxauto.certificatesmanager.v1.CertificatesManager/
+        pathtype: ImplementationSpecific
+        type: grpc
+        backend_port: 6941
+
+  certificates-manager-two:
+    special_image: edoxauto-docker-local.artifact.firm.ru/certificates-manager:{{ service_version }}
+    count_replicas: 1
+    k8s_service_name: certificates-manager
+    k8s_selector_label: certificates-manager
+    consul_template: certificates-manager
+    consul_service_name: certificates-manager
+    consul_service_id_suffix: two
+    certificate_manager_cron: "{{ certificate_manager_cron_two }}"
+    ports:
+      grpc: { internal: 8082, external: 6941 }
+      http: { internal: 8081, external: 6940 }
+    cpu: '800m'
+    memory: '2500Mi'
+    ingress_hostname: "{{ balancer_url_k8s }}"
+    ingress_paths:
+      - path: /api/v1/CertificatesManager/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 6940
+      - path: /grpc.edoxauto.certificatesmanager.v1.CertificatesManager/
+        pathtype: ImplementationSpecific
+        type: grpc
+        backend_port: 6941
+
+  database-anonymizer:
+    ports:
+      grpc: { internal: 8082, external: 18321 }
+      http: { internal: 8081, external: 18320 }
+    cpu: '1500m'
+    memory: '1800Mi'
+    ingress_hostname: "{{ balancer_url_k8s }}"
+    ingress_paths:
+      - path: /api/v1/RelationalDatabase/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 18320
+      - path: /grpc.edoxauto.databaseAnonymizer.RelationalDatabase/
+        pathtype: ImplementationSpecific
+        type: grpc
+        backend_port: 18321
+
+  diadoc-connector-one:
+    special_image: edoxauto-docker-local.artifact.firm.ru/diadoc-connector:{{ service_version }}
+    count_replicas: 1
+    k8s_service_name: diadoc-connector
+    k8s_selector_label: diadoc-connector
+    consul_template: diadoc-connector
+    consul_service_name: diadoc-connector
+    consul_service_id_suffix: one
+    ports:
+      grpc: { internal: 8082, external: 6901 }
+      http: { internal: 8081, external: 6900 }
+    env:
+      CRYPTO_PRO_LICENSE_KEY: "{{ vault_secrets.crypto_pro_key_one }}"
+
+  diadoc-connector-two:
+    special_image: edoxauto-docker-local.artifact.firm.ru/diadoc-connector:{{ service_version }}
+    count_replicas: 1
+    k8s_service_name: diadoc-connector
+    k8s_selector_label: diadoc-connector
+    consul_template: diadoc-connector
+    consul_service_name: diadoc-connector
+    consul_service_id_suffix: two
+    ports:
+      grpc: { internal: 8082, external: 6901 }
+      http: { internal: 8081, external: 6900 }
+    env:
+      CRYPTO_PRO_LICENSE_KEY: "{{ vault_secrets.crypto_pro_key_two }}"
+
+  digital-profile:
+    ports:
+      grpc: { internal: 8082, external: 17401 }
+      http: { internal: 8081, external: 17400 }
+    cpu: '800m'
+    ingress_hostname: "{{ balancer_url_k8s }}"
+    ingress_paths:
+      - path: /api/v1/DigitalProfile/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 17400
+      - path: /grpc.edoxauto.digitalprofile.DataService/
+        pathtype: ImplementationSpecific
+        type: grpc
+        backend_port: 17401
+      - path: /grpc.edoxauto.digitalprofile.AuthorizationService/
+        pathtype: ImplementationSpecific
+        type: grpc
+        backend_port: 17401
+
+  edox-office:
+    ports:
+      grpc: { internal: 8082, external: 7025 } # У сервиса нет GRPC порта, данный порт HTTP/2
+      http: { internal: 8081, external: 5025 }
+    exclude_healthcheck_grpc_port: true
+    count_replicas: 1
+    ingress_hostname: "{{ balancer_url_edox_office }}"
+    ingress_paths:
+      - path: /
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 5025
+    websocket_enabled: true
+    cpu: '1000m'
+    memory: '1000Mi'
+
+  edox-office-hotfix:
+    special_image: edoxauto-docker-local.artifact.firm.ru/edox-office:{{ service_version }}
+    ports:
+      grpc: { internal: 8082, external: 7026 } # У сервиса нет GRPC порта, данный порт HTTP/2
+      http: { internal: 8081, external: 5026 }
+    exclude_healthcheck_grpc_port: true
+    count_replicas: 1
+    ingress_hostname: "{{ balancer_url_edox_office_hotfix }}"
+    ingress_paths:
+      - path: /
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 5026
+    websocket_enabled: true
+    cpu: '1000m'
+    memory: '1000Mi'
+
+  edox-office-webapi:
+    ports:
+      grpc: { internal: 8082, external: 8083 } # У сервиса нет GRPC порта, данный порт HTTP/2
+      http: { internal: 8091, external: 8091 }
+    exclude_healthcheck_grpc_port: true
+    count_replicas: 1
+    ingress_hostname: "{{ balancer_url_edox_office }}"
+    ingress_paths:
+      - path: /new
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 8091
+    websocket_enabled: true
+    cpu: '800m'
+    memory: '800Mi'
+
+  edox-office-webapi-hotfix:
+    special_image: edoxauto-docker-local.artifact.firm.ru/edox-office-webapi:{{ service_version }}
+    ports:
+      grpc: { internal: 8082, external: 8084 } # У сервиса нет GRPC порта, данный порт HTTP/2
+      http: { internal: 8091, external: 8092 }
+    exclude_healthcheck_grpc_port: true
+    count_replicas: 1
+    ingress_hostname: "{{ balancer_url_edox_office_hotfix }}"
+    ingress_paths:
+      - path: /new
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 8092
+    websocket_enabled: true
+    cpu: '800m'
+    memory: '800Mi'
+
+  federal-financial-monitoring-one:
+    special_image: edoxauto-docker-local.artifact.firm.ru/federal-financial-monitoring:{{ service_version }}
+    count_replicas: 1
+    k8s_service_name: federal-financial-monitoring
+    k8s_selector_label: federal-financial-monitoring
+    consul_template: federal-financial-monitoring
+    consul_service_name: federal-financial-monitoring
+    consul_service_id_suffix: one
+    ffm_cron: "{{ federal_financial_monitoring_cron_one }}"
+    ports:
+      http: { internal: 8081, external: 6960 }
+    cpu: '600m'
+    memory: '1000Mi'
+
+  federal-financial-monitoring-two:
+    special_image: edoxauto-docker-local.artifact.firm.ru/federal-financial-monitoring:{{ service_version }}
+    count_replicas: 1
+    k8s_service_name: federal-financial-monitoring
+    k8s_selector_label: federal-financial-monitoring
+    consul_template: federal-financial-monitoring
+    consul_service_name: federal-financial-monitoring
+    consul_service_id_suffix: two
+    ffm_cron: "{{ federal_financial_monitoring_cron_two }}"
+    ports:
+      http: { internal: 8081, external: 6960 }
+    cpu: '600m'
+    memory: '1000Mi'
+
+  file-accessor:
+    ports:
+      grpc: { internal: 8082, external: 6911 }
+      http: { internal: 8081, external: 6910 }
+    cpu: '600m'
+    memory: '1100Mi'
+    ingress_hostname: "{{ balancer_url_k8s }}"
+    ingress_paths:
+      - path: /api/v1/FileAccessor/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 6910
+      - path: /api/v1/FileUploader/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 6910
+      - path: /edoxauto.FileAccessor.FileService/
+        pathtype: ImplementationSpecific
+        type: grpc
+        backend_port: 6911
+
+  firm-business:
+    ports:
+      http: { internal: 8081, external: 5241 }
+    ingress_hostname: "{{ balancer_url_finam_business }}"
+    websocket_enabled: true
+    ingress_paths:
+      - path: /
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 5241
+
+  fssp-connector:
+    ports:
+      grpc: { internal: 8082, external: 6951 }
+      http: { internal: 8081, external: 6950 }
+    ingress_hostname: "{{ balancer_url_k8s }}"
+    ingress_paths:
+      - path: /api/v1/FSSPConnector/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 6950
+      - path: /grpc.edoxauto.fssp.connector.FSSPConnector/
+        pathtype: ImplementationSpecific
+        type: grpc
+        backend_port: 6951
+
+# Не несем в кубер, по согласованию с разработчиками, т.к. его ни кто не использует
+#  hashing:
+#    ports:
+#      grpc: { internal: 8082, external: 27061 }
+#      http: { internal: 8081, external: 27060 }
+#    cpu: '600m'
+#    memory: '600Mi'
+#    count_replicas: 1
+
+  kafka-connector-consumers:
+    special_image: edoxauto-docker-local.artifact.firm.ru/kafka-connector:{{ service_version }}
+    k8s_service_name: kafka-connector-consumers
+    k8s_selector_label: kafka-connector-consumers
+    consul_template: kafka-connector-consumers
+    consul_service_name: kafka-connector-consumers
+    ports:
+      http: { internal: 8081, external: 26921 }
+    cpu: '600m'
+    memory: '1000Mi'
+
+  kafka-connector-producers:
+    special_image: edoxauto-docker-local.artifact.firm.ru/kafka-connector:{{ service_version }}
+    k8s_service_name: kafka-connector-producers
+    k8s_selector_label: kafka-connector-producers
+    consul_template: kafka-connector-producers
+    consul_service_name: kafka-connector-producers
+    count_replicas: 1
+    ports:
+      http: { internal: 8081, external: 26922 }
+    cpu: '600m'
+    memory: '800Mi'
+
+  message-proxy:
+    ports:
+      grpc: { internal: 8082, external: 12568 }
+      http: { internal: 8081, external: 12567 }
+    cpu: '1000m'
+    ingress_hostname: "{{ balancer_url_message_proxy }}"
+    ingress_paths:
+      - path: /api/v1/MessageProxy/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 12567
+      - path: /sms
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 12567
+      - path: /edoxauto.MessageProxy.SmsService/
+        pathtype: ImplementationSpecific
+        type: grpc
+        backend_port: 12568
+# Т.к. сервис расположен в отдельном NS и имеет другой consul проект
+    consul_token: "{{ vault_secrets.consul_token_mspu01 }}"
+    consul_env_path: pp/mspu01/kubernetes
+    consul_env_code: pp-mspu01
+
+  message-proxy-control-panel:
+    ports:
+      grpc: { internal: 8082, external: 12782 }
+      http: { internal: 8081, external: 12781 }
+    cpu: '1000m'
+    ingress_hostname: "{{ balancer_url_message_proxy_admin }}"
+    websocket_enabled: true
+    ingress_paths:
+      - path: /
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 12781
+# Т.к. сервис расположен в отдельном NS и имеет другой consul проект
+    consul_token: "{{ vault_secrets.consul_token_mspu01 }}"
+    consul_env_path: pp/mspu01/kubernetes
+    consul_env_code: pp-mspu01
+
+  moex-loaders-one:
+    ports:
+      grpc: { internal: 8082, external: 7011 }
+      http: { internal: 8081, external: 7010 }
+    special_image: edoxauto-docker-local.artifact.firm.ru/moex-loaders:{{ service_version }}
+    count_replicas: 1
+    k8s_service_name: moex-loaders
+    k8s_selector_label: moex-loaders
+    consul_template: moex-loaders
+    consul_service_name: moex-loaders
+    consul_service_id_suffix: one
+    BestPrivateInvestorCronUtc: "{{ moex_loaders_cron_one }}"
+
+  moex-loaders-two:
+    ports:
+      grpc: { internal: 8082, external: 7011 }
+      http: { internal: 8081, external: 7010 }
+    special_image: edoxauto-docker-local.artifact.firm.ru/moex-loaders:{{ service_version }}
+    count_replicas: 1
+    k8s_service_name: moex-loaders
+    k8s_selector_label: moex-loaders
+    consul_template: moex-loaders
+    consul_service_name: moex-loaders
+    consul_service_id_suffix: two
+    BestPrivateInvestorCronUtc: "{{ moex_loaders_cron_two }}"
+
+  passport-recognizer:
+    ports:
+      grpc: { internal: 8082, external: 15002 }
+      http: { internal: 8081, external: 4398 }
+    cpu: '800m'
+    memory: '3000Mi'
+    ingress_hostname: "{{ balancer_url_k8s }}"
+    ingress_paths:
+      - path: /api/v1/DocumentsRecognizer/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 4398
+      - path: /passportRecognizer.v1.DocumentsRecognizerService/
+        pathtype: ImplementationSpecific
+        type: grpc
+        backend_port: 15002
+
+  preliminary-order:
+    ports:
+      http: { internal: 8081, external: 6988 }
+    cpu: '600m'
+    ingress_hostname: "{{ balancer_url_preliminary_order }}"
+    ingress_paths:
+      - path: /
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 6988
+
+  prop-connector:
+    ports:
+      grpc: { internal: 8082, external: 6981 }
+      http: { internal: 8081, external: 6980 }
+    cpu: '600m'
+    ingress_hostname: "{{ balancer_url_prop_connector }}"
+    ingress_paths:
+      - path: /api/v1/PropConnector/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 6980
+      - path: /grpc.edoxauto.prop.connector.PropConnector/
+        pathtype: ImplementationSpecific
+        type: grpc
+        backend_port: 6981
+      - path: /grpc.edoxauto.prop.connector.PropConnectorAuth/
+        pathtype: ImplementationSpecific
+        type: grpc
+        backend_port: 6981
+
+  prop-trading:
+    ports:
+      grpc: { internal: 8082, external: 6983 }
+      http: { internal: 8081, external: 6982 }
+    cpu: '600m'
+    ingress_hostname: "{{ balancer_url_prop_trading }}"
+    ingress_paths:
+      - path: /
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 6982
+      - path: /grpc
+        pathtype: ImplementationSpecific
+        type: grpc
+        backend_port: 6983
+
+  raif-connector-one:
+    special_image: edoxauto-docker-local.artifact.firm.ru/raif-connector:{{ service_version }}
+    count_replicas: 1
+    k8s_service_name: raif-connector
+    k8s_selector_label: raif-connector
+    consul_template: raif-connector
+    consul_service_name: raif-connector
+    consul_service_id_suffix: one
+    ports:
+      grpc: { internal: 8082, external: 26901 }
+      http: { internal: 8081, external: 26900 }
+    cpu: '600m'
+    auth_login: "{{ raif_connector_auth_login_one }}"
+    auth_password: "{{ vault_secrets.raif_connector_password_one }}"
+    ingress_hostname: "{{ balancer_url_k8s }}"
+    ingress_paths:
+      - path: /api/v1/RaifConnector/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 26900
+      - path: /raif.BankService/
+        pathtype: ImplementationSpecific
+        type: grpc
+        backend_port: 26901
+    volume:
+      pvc_name: raif-connector-one-data
+      mount_path: /app/cache-files
+      storage_class: longhorn
+      size: 100Mi
+      access_modes:
+        - ReadWriteMany # Том можно одновременно монтировать на нескольких узлах и читать/писать из разных pod’ов. Если выставить другой mod, то при пересоздании POD со стратегией RollingUpdate, когда поднимается второй POD мы получим ошибку - Multi-Attach error for volume. Volume is already used by pod(s)
+
+  raif-connector-two:
+    special_image: edoxauto-docker-local.artifact.firm.ru/raif-connector:{{ service_version }}
+    count_replicas: 1
+    k8s_service_name: raif-connector
+    k8s_selector_label: raif-connector
+    consul_template: raif-connector
+    consul_service_name: raif-connector
+    consul_service_id_suffix: two
+    ports:
+      grpc: { internal: 8082, external: 26901 }
+      http: { internal: 8081, external: 26900 }
+    cpu: '600m'
+    auth_login: "{{ raif_connector_auth_login_two }}"
+    auth_password: "{{ vault_secrets.raif_connector_password_two }}"
+    ingress_hostname: "{{ balancer_url_k8s }}"
+    ingress_paths:
+      - path: /api/v1/RaifConnector/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 26900
+      - path: /raif.BankService/
+        pathtype: ImplementationSpecific
+        type: grpc
+        backend_port: 26901
+    volume:
+      pvc_name: raif-connector-two-data
+      mount_path: /app/cache-files
+      storage_class: longhorn
+      size: 100Mi
+      access_modes:
+        - ReadWriteMany # Том можно одновременно монтировать на нескольких узлах и читать/писать из разных pod’ов. Если выставить другой mod, то при пересоздании POD со стратегией RollingUpdate, когда поднимается второй POD мы получим ошибку - Multi-Attach error for volume. Volume is already used by pod(s)
+
+  report-converter:
+    ports:
+      grpc: { internal: 8082, external: 6921 }
+      http: { internal: 8081, external: 6920 }
+    cpu: '1500m'
+    ingress_hostname: "{{ balancer_url_k8s }}"
+    ingress_paths:
+      - path: /api/v1/ReportConverter/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 6920
+      - path: /grpc.edoxauto.reportconverter.v1.ReportConverter/
+        pathtype: ImplementationSpecific
+        type: grpc
+        backend_port: 6921
+      - path: /grpc.edoxauto.reportconverter.Common.ReportConverterCommon/
+        pathtype: ImplementationSpecific
+        type: grpc
+        backend_port: 6921
+
+  scoring:
+    ports:
+      grpc: { internal: 8082, external: 6985 }
+      http: { internal: 8081, external: 6984 }
+    cpu: '600m'
+    ingress_hostname: "{{ balancer_url_k8s }}"
+    ingress_paths:
+      - path: /api/v1/Scoring/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 6984
+      - path: /grpc.edoxauto.Scoring.Scoring/
+        pathtype: ImplementationSpecific
+        type: grpc
+        backend_port: 6985
+
+  signer-one:
+    special_image: edoxauto-docker-local.artifact.firm.ru/signer:{{ service_version }}
+    count_replicas: 1
+    k8s_service_name: signer
+    k8s_selector_label: signer
+    consul_template: signer
+    consul_service_name: signer
+    consul_service_id_suffix: one
+    ports:
+      grpc: { internal: 8082, external: 2330 }
+      http:  { internal: 8081, external: 2329 }
+    cpu: '1000m'
+    memory: '800Mi'
+    ingress_hostname: "{{ balancer_url_k8s }}"
+    ingress_paths:
+      - path: /api/v1/Signer/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 2329
+      - path: /api/v1/SignatureVerifier/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 2329
+      - path: /api/v1/CertificatesConverter/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 2329
+      - path: /api/v1/SignerProxy/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 2329
+      - path: /grpc.edoxauto.signer.Signer/
+        pathtype: ImplementationSpecific
+        type: grpc
+        backend_port: 2330
+      - path: /grpc.edoxauto.signatureVerifier.SignatureVerifier/
+        pathtype: ImplementationSpecific
+        type: grpc
+        backend_port: 2330
+      - path: /grpc.edoxauto.certificatesConverter.CertificatesConverter/
+        pathtype: ImplementationSpecific
+        type: grpc
+        backend_port: 2330
+      - path: /grpc.edoxauto.SignerProxy.SignerProxy/
+        pathtype: ImplementationSpecific
+        type: grpc
+        backend_port: 2330
+    env:
+      SignerSettings__RootCertificatesPath: /app/custom-root-certificates/Root/
+      SignerSettings__CACertificatesPath: /app/custom-root-certificates/CA/
+      CRYPTO_PRO_KEY: "{{ vault_secrets.crypto_pro_key_one }}"
+    certificates:
+      secret_name: signer-certificates
+      mount_path: /app/custom-root-certificates
+      files:
+        signer_root_crypto_pro:
+          path: Root/crypto_pro_gost_2012.cer
+          src: signer/Root/crypto_pro_gost_2012.cer
+        signer_root_mindigital:
+          path: Root/mindigital_root.cer
+          src: signer/Root/mindigital_root.cer
+        signer_root_phoenix:
+          path: Root/phoenix_root.cer
+          src: signer/Root/phoenix_root.cer
+        signer_root_cert_1:
+          path: Root/root_cert_1.cer
+          src: signer/Root/root_cert_1.cer
+        signer_root_cert_2:
+          path: Root/root_cert_2.cer
+          src: signer/Root/root_cert_2.cer
+        signer_root_cert_3:
+          path: Root/root_cert_3.cer
+          src: signer/Root/root_cert_3.cer
+        signer_root_treasury:
+          path: Root/treasury_russia_root.crt
+          src: signer/Root/treasury_russia_root.crt
+        signer_ca_icrs_nbki:
+          path: CA/icrs_nbki_ru2023.cer
+          src: signer/CA/icrs_nbki_ru2023.cer
+        signer_ca_kontur:
+          path: CA/kontur_intermediate.cer
+          src: signer/CA/kontur_intermediate.cer
+        signer_ca_treasury:
+          path: CA/treasury_russia_ca.crt
+          src: signer/CA/treasury_russia_ca.crt
+        signer_ca_u30_prod:
+          path: CA/u30_prod.cer
+          src: signer/CA/u30_prod.cer
+        signer_ca_u30_test:
+          path: CA/u30_test.cer
+          src: signer/CA/u30_test.cer
+
+  signer-two:
+    special_image: edoxauto-docker-local.artifact.firm.ru/signer:{{ service_version }}
+    count_replicas: 1
+    k8s_service_name: signer
+    k8s_selector_label: signer
+    consul_template: signer
+    consul_service_name: signer
+    consul_service_id_suffix: two
+    ports:
+      grpc: { internal: 8082, external: 2330 }
+      http:  { internal: 8081, external: 2329 }
+    cpu: '1000m'
+    memory: '800Mi'
+    ingress_hostname: "{{ balancer_url_k8s }}"
+    ingress_paths:
+      - path: /api/v1/Signer/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 2329
+      - path: /api/v1/SignatureVerifier/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 2329
+      - path: /api/v1/CertificatesConverter/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 2329
+      - path: /api/v1/SignerProxy/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 2329
+      - path: /grpc.edoxauto.signer.Signer/
+        pathtype: ImplementationSpecific
+        type: grpc
+        backend_port: 2330
+      - path: /grpc.edoxauto.signatureVerifier.SignatureVerifier/
+        pathtype: ImplementationSpecific
+        type: grpc
+        backend_port: 2330
+      - path: /grpc.edoxauto.certificatesConverter.CertificatesConverter/
+        pathtype: ImplementationSpecific
+        type: grpc
+        backend_port: 2330
+      - path: /grpc.edoxauto.SignerProxy.SignerProxy/
+        pathtype: ImplementationSpecific
+        type: grpc
+        backend_port: 2330
+    env:
+      SignerSettings__RootCertificatesPath: /app/custom-root-certificates/Root/
+      SignerSettings__CACertificatesPath: /app/custom-root-certificates/CA/
+      CRYPTO_PRO_KEY: "{{ vault_secrets.crypto_pro_key_two }}"
+    certificates:
+      secret_name: signer-certificates
+      mount_path: /app/custom-root-certificates
+      files:
+        signer_root_crypto_pro:
+          path: Root/crypto_pro_gost_2012.cer
+          src: signer/Root/crypto_pro_gost_2012.cer
+        signer_root_mindigital:
+          path: Root/mindigital_root.cer
+          src: signer/Root/mindigital_root.cer
+        signer_root_phoenix:
+          path: Root/phoenix_root.cer
+          src: signer/Root/phoenix_root.cer
+        signer_root_cert_1:
+          path: Root/root_cert_1.cer
+          src: signer/Root/root_cert_1.cer
+        signer_root_cert_2:
+          path: Root/root_cert_2.cer
+          src: signer/Root/root_cert_2.cer
+        signer_root_cert_3:
+          path: Root/root_cert_3.cer
+          src: signer/Root/root_cert_3.cer
+        signer_root_treasury:
+          path: Root/treasury_russia_root.crt
+          src: signer/Root/treasury_russia_root.crt
+        signer_ca_icrs_nbki:
+          path: CA/icrs_nbki_ru2023.cer
+          src: signer/CA/icrs_nbki_ru2023.cer
+        signer_ca_kontur:
+          path: CA/kontur_intermediate.cer
+          src: signer/CA/kontur_intermediate.cer
+        signer_ca_treasury:
+          path: CA/treasury_russia_ca.crt
+          src: signer/CA/treasury_russia_ca.crt
+        signer_ca_u30_prod:
+          path: CA/u30_prod.cer
+          src: signer/CA/u30_prod.cer
+        signer_ca_u30_test:
+          path: CA/u30_test.cer
+          src: signer/CA/u30_test.cer
+
+  signer-proxy-one:
+    special_image: edoxauto-docker-local.artifact.firm.ru/signer:{{ service_version }}
+    count_replicas: 1
+    k8s_service_name: signer-proxy
+    k8s_selector_label: signer-proxy
+    consul_template: signer-proxy
+    consul_service_name: signer-proxy
+    consul_service_id_suffix: one
+    ports:
+      grpc: { internal: 8082, external: 2332 }
+      http:  { internal: 8081, external: 2331 }
+    cpu: '1000m'
+    memory: '5000Mi'
+    ingress_hostname: "{{ balancer_url_k8s }}"
+    ingress_paths:
+      - path: /api/v1/SignalCom/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 2331
+      - path: /grpc.edoxauto.signalCom.SignalCom/
+        pathtype: ImplementationSpecific
+        type: grpc
+        backend_port: 2332
+    env:
+      SignerSettings__RootCertificatesPath: /app/custom-root-certificates/Root/
+      SignerSettings__CACertificatesPath: /app/custom-root-certificates/CA/
+      CRYPTO_PRO_KEY: "{{ vault_secrets.crypto_pro_key_three }}"
+    certificates:
+      secret_name: signer-certificates
+      mount_path: /app/custom-root-certificates
+      files:
+        signer_root_crypto_pro:
+          path: Root/crypto_pro_gost_2012.cer
+          src: signer/Root/crypto_pro_gost_2012.cer
+        signer_root_mindigital:
+          path: Root/mindigital_root.cer
+          src: signer/Root/mindigital_root.cer
+        signer_root_phoenix:
+          path: Root/phoenix_root.cer
+          src: signer/Root/phoenix_root.cer
+        signer_root_cert_1:
+          path: Root/root_cert_1.cer
+          src: signer/Root/root_cert_1.cer
+        signer_root_cert_2:
+          path: Root/root_cert_2.cer
+          src: signer/Root/root_cert_2.cer
+        signer_root_cert_3:
+          path: Root/root_cert_3.cer
+          src: signer/Root/root_cert_3.cer
+        signer_root_treasury:
+          path: Root/treasury_russia_root.crt
+          src: signer/Root/treasury_russia_root.crt
+        signer_ca_icrs_nbki:
+          path: CA/icrs_nbki_ru2023.cer
+          src: signer/CA/icrs_nbki_ru2023.cer
+        signer_ca_kontur:
+          path: CA/kontur_intermediate.cer
+          src: signer/CA/kontur_intermediate.cer
+        signer_ca_treasury:
+          path: CA/treasury_russia_ca.crt
+          src: signer/CA/treasury_russia_ca.crt
+        signer_ca_u30_prod:
+          path: CA/u30_prod.cer
+          src: signer/CA/u30_prod.cer
+        signer_ca_u30_test:
+          path: CA/u30_test.cer
+          src: signer/CA/u30_test.cer
+
+  signer-proxy-two:
+    special_image: edoxauto-docker-local.artifact.firm.ru/signer:{{ service_version }}
+    count_replicas: 1
+    k8s_service_name: signer-proxy
+    k8s_selector_label: signer-proxy
+    consul_template: signer-proxy
+    consul_service_name: signer-proxy
+    consul_service_id_suffix: two
+    ports:
+      grpc: { internal: 8082, external: 2332 }
+      http:  { internal: 8081, external: 2331 }
+    cpu: '1000m'
+    memory: '5000Mi'
+    ingress_hostname: "{{ balancer_url_k8s }}"
+    ingress_paths:
+      - path: /api/v1/SignalCom/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 2331
+      - path: /grpc.edoxauto.signalCom.SignalCom/
+        pathtype: ImplementationSpecific
+        type: grpc
+        backend_port: 2332
+    env:
+      SignerSettings__RootCertificatesPath: /app/custom-root-certificates/Root/
+      SignerSettings__CACertificatesPath: /app/custom-root-certificates/CA/
+      CRYPTO_PRO_KEY: "{{ vault_secrets.crypto_pro_key_four }}"
+    certificates:
+      secret_name: signer-certificates
+      mount_path: /app/custom-root-certificates
+      files:
+        signer_root_crypto_pro:
+          path: Root/crypto_pro_gost_2012.cer
+          src: signer/Root/crypto_pro_gost_2012.cer
+        signer_root_mindigital:
+          path: Root/mindigital_root.cer
+          src: signer/Root/mindigital_root.cer
+        signer_root_phoenix:
+          path: Root/phoenix_root.cer
+          src: signer/Root/phoenix_root.cer
+        signer_root_cert_1:
+          path: Root/root_cert_1.cer
+          src: signer/Root/root_cert_1.cer
+        signer_root_cert_2:
+          path: Root/root_cert_2.cer
+          src: signer/Root/root_cert_2.cer
+        signer_root_cert_3:
+          path: Root/root_cert_3.cer
+          src: signer/Root/root_cert_3.cer
+        signer_root_treasury:
+          path: Root/treasury_russia_root.crt
+          src: signer/Root/treasury_russia_root.crt
+        signer_ca_icrs_nbki:
+          path: CA/icrs_nbki_ru2023.cer
+          src: signer/CA/icrs_nbki_ru2023.cer
+        signer_ca_kontur:
+          path: CA/kontur_intermediate.cer
+          src: signer/CA/kontur_intermediate.cer
+        signer_ca_treasury:
+          path: CA/treasury_russia_ca.crt
+          src: signer/CA/treasury_russia_ca.crt
+        signer_ca_u30_prod:
+          path: CA/u30_prod.cer
+          src: signer/CA/u30_prod.cer
+        signer_ca_u30_test:
+          path: CA/u30_test.cer
+          src: signer/CA/u30_test.cer
+
+  tnved:
+    ports:
+      grpc: { internal: 8082, external: 6987 }
+      http: { internal: 8081, external: 6986 }
+    cpu: '800m'
+    ingress_hostname: "{{ balancer_url_k8s }}"
+    ingress_paths:
+      - path: /api/v1/Tnved/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 6986
+      - path: /grpc.edoxauto.tnved.Tnved/
+        pathtype: ImplementationSpecific
+        type: grpc
+        backend_port: 6987
+
+  tsp-connector:
+    ports:
+      grpc: { internal: 8082, external: 9856 }
+      http:  { internal: 8081, external: 9854 }
+    cpu: '1500m'
+    ingress_hostname: "{{ balancer_url_k8s }}"
+    ingress_paths:
+      - path: /api/v1/tsp/
+        pathtype: ImplementationSpecific
+        type: http
+        backend_port: 9854
+      - path: /tsp.TimeStampProtocol/
+        pathtype: ImplementationSpecific
+        type: grpc
+        backend_port: 9856
+    env:
+      ApplicationSettings__CertificatePrimaryPath: /app/CustomCertificates/cert_tsa-enotary.cer
+      ApplicationSettings__CertificateIntermediatePath: /app/CustomCertificates/subca_iit_2023.cer
+      ApplicationSettings__CertificateTrustedPath: /app/CustomCertificates/root_mcs_2022.cer
+    certificates:
+      secret_name: tsp-connector-certificates
+      mount_path: /app/CustomCertificates
+      files:
+        tsp_primary:
+          path: cert_tsa-enotary.cer
+          src: tsp-connector/cert_tsa-enotary.cer
+        tsp_trusted:
+          path: root_mcs_2022.cer
+          src: tsp-connector/root_mcs_2022.cer
+        tsp_intermediate:
+          path: subca_iit_2023.cer
+          src: tsp-connector/subca_iit_2023.cer

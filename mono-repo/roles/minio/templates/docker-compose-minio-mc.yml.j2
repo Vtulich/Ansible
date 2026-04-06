@@ -1,0 +1,64 @@
+﻿version: '3.7'
+
+services:
+  mc-service:
+    image: minio/mc
+    container_name: minio-mc
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set {{ node }} http://{{ inventory_hostname }}:{{ port_api }} {{ minio_admin_user }} {{ minio_admin_password }};
+      /usr/bin/mc idp ldap add {{ node }} server_addr=prdc.office.firm.ru:636 tls_skip_verify=on lookup_bind_dn=CN={{ ad_user_connect }},OU=AD,OU=Services,OU=Users,OU=FMS,DC=office,DC=firm,DC=ru lookup_bind_password={{ ad_user_password }} user_dn_search_base_dn=OU=Users,OU=FMS,DC=office,DC=firm,DC=ru user_dn_search_filter='(&(objectClass=user)(sAMAccountName=%s))' group_search_base_dn=OU=ROL,OU=Groups,OU=FMS,DC=office,DC=firm,DC=ru group_search_filter='(&(objectclass=group)(member=%d))';
+      /usr/bin/mc admin service restart {{ node }};
+      /usr/bin/mc idp ldap policy attach {{ node }} consoleAdmin --group='CN={{ services[service_name].ad_group_admin }},OU=ROL,OU=Groups,OU=FMS,DC=office,DC=firm,DC=ru';
+      /usr/bin/mc idp ldap policy attach {{ node }} consoleAdmin --user='CN={{ services[service_name].user_minio }},OU=Services,OU=Users,OU=FMS,DC=office,DC=firm,DC=ru';
+      /usr/bin/mc mb {{ node }}/{{ services[service_name].bucket_name }};
+      /usr/bin/mc policy set private {{ node }}/{{ services[service_name].bucket_name }};
+
+      echo '{
+          \"Version\": \"2012-10-17\",
+          \"Statement\": [
+              {
+                  \"Effect\": \"Deny\",
+                  \"Action\": \"s3:*\",
+                  \"Resource\": [
+                      \"arn:aws:s3:::{{ services[service_name].bucket_name }}\",
+                      \"arn:aws:s3:::{{ services[service_name].bucket_name }}/*\"
+                  ],
+                  \"Condition\": {
+                      \"StringNotEquals\": {
+                          \"aws:userid\": \"CN={{ services[service_name].user_minio }},OU=Services,OU=Users,OU=FMS,DC=office,DC=firm,DC=ru\"
+                      }
+                  }
+              }
+          ]
+      }' > deny_policy_{{ services[service_name].bucket_name }}.json;
+
+      echo '{
+            \"Version\": \"2012-10-17\",
+            \"Statement\": [
+                  {
+                     \"Action\": \"s3:*\",
+                     \"Effect\": \"Allow\",
+                     \"Resource\": [
+                         \"arn:aws:s3:::{{ services[service_name].bucket_name }}\",
+                         \"arn:aws:s3:::{{ services[service_name].bucket_name }}/*\"
+                     ]
+                  }
+               ]
+            }' > write_policy_{{ services[service_name].bucket_name }}.json;
+
+      mc idp ldap policy detach {{ node }} consoleAdmin --user "CN={{ services[service_name].user_minio }},OU=Services,OU=Users,OU=FMS,DC=office,DC=firm,DC=ru";
+
+      mc admin policy create {{ node }} deny_policy_{{ services[service_name].bucket_name }} deny_policy_{{ services[service_name].bucket_name }}.json;
+      mc idp ldap policy set {{ node }} deny_policy_{{ services[service_name].bucket_name }};
+
+      mc admin policy create {{ node }} write_policy_{{ services[service_name].bucket_name }} write_policy_{{ services[service_name].bucket_name }}.json;
+      mc idp ldap policy attach {{ node }} write_policy_{{ services[service_name].bucket_name }} --user='CN={{ services[service_name].user_minio }},OU=Services,OU=Users,OU=FMS,DC=office,DC=firm,DC=ru';
+
+      mc admin service restart {{ node }};
+
+      /usr/bin/mc version enable {{ node }}/{{ services[service_name].bucket_name }};
+      /usr/bin/mc replicate add {{ node }}/{{ services[service_name].bucket_name }} --remote-bucket 'http://{{ minio_admin_user }}:{{ minio_admin_password }}@{{ groups[target_group]|difference(inventory_hostname)|join("") }}:{{ port_api }}/{{ services[service_name].bucket_name }}' --replicate \"delete,delete-marker,existing-objects\";
+
+      exec sleep inf;
+      "

@@ -1,0 +1,97 @@
+﻿- name: Инклюдим переменные из vars
+  ansible.builtin.include_vars:
+    file: "{{ env_code }}.yml"
+
+- name: Include defaults variables
+  ansible.builtin.include_vars:
+    file: defaults/main.yml
+
+- name: Импортируем чувствительные переменные из Vault
+  block:
+    - name: Читаем Vault токен
+      become: true
+      slurp:
+        src: "/opt/{{ vault_agent_name_directory }}/.token_unwrapped"
+      register: vault_token
+
+    - name: Получаем секреты из Vault
+      set_fact:
+        vault_secrets: "{{ lookup('community.hashi_vault.hashi_vault',
+                                  vault_ansible_secret_path,
+                                  url=vault_agent_api_url,
+                                  token=(vault_token.content | b64decode)) }}"
+  delegate_to: localhost
+
+- name: Push config
+  community.general.consul_kv:
+    token: "{{ edox_services[service_name].consul_token | default(vault_secrets.consul_token_edou02) }}"
+    datacenter: "{{ consul_datacenter }}"
+    host: consul
+    port: 443
+    scheme: https
+    key: "{{ edox_services[service_name].consul_env_path | default(consul_env_path) }}/{{ edox_services[service_name].consul_service_name | default(service_name) }}/{{ service_version }}/settings.{{ service_config_version }}"
+    value: "{{ lookup('template', 'templates/consul/{{ env_code }}/{{ edox_services[service_name].consul_template | default(service_name) }}.yml.j2') | string }}"
+
+- name: Deploy Secrets Consul
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ vault_secrets.connectionk8s | from_yaml }}"
+    namespace: "{{ namespace }}"
+    template: ./templates/secrets/secrets-consul-token.yml.j2
+
+- name: Создаём или обновляем секрет с сертификатами
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ vault_secrets.connectionk8s | from_yaml }}"
+    namespace: "{{ namespace }}"
+    definition: "{{ lookup('template', 'templates/secrets/certificates.yml.j2') }}"
+  when: edox_services[service_name].certificates is defined
+
+- name: Deploy ConfigMap
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ vault_secrets.connectionk8s | from_yaml }}"
+    namespace: "{{ namespace }}"
+    template: ./templates/configmap/configmap.yml.j2
+
+- name: Deploy Service
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ vault_secrets.connectionk8s | from_yaml }}"
+    namespace: "{{ namespace }}"
+    template: ./templates/service/services.yml.j2
+
+- name: Deploy PVC
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ vault_secrets.connectionk8s | from_yaml }}"
+    namespace: "{{ namespace }}"
+    template: ./templates/pvc/pvc.yml.j2
+  when: edox_services[service_name].volume is defined
+
+- name: Deploy HTTP ingress
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ vault_secrets.connectionk8s | from_yaml }}"
+    namespace: "{{ namespace }}"
+    template: ./templates/ingress/ingress-http.yml.j2
+  when:
+# есть хотя бы один путь, у которого type не grpc
+    - (edox_services[service_name].ingress_paths | default([]) | rejectattr('type', 'equalto', 'grpc') | list | length) > 0
+
+- name: Deploy gRPC ingress
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ vault_secrets.connectionk8s | from_yaml }}"
+    namespace: "{{ namespace }}"
+    template: ./templates/ingress/ingress-grpc.yml.j2
+  when:
+# есть путь с type: grpc
+    - (edox_services[service_name].ingress_paths | default([]) | selectattr('type', 'equalto', 'grpc') | list | length) > 0
+
+- name: Deploy Deployment
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ vault_secrets.connectionk8s | from_yaml }}"
+    namespace: "{{ namespace }}"
+    template: ./templates/deployment/deployment.yml.j2

@@ -1,0 +1,32 @@
+﻿apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ edox_services[service_name].k8s_service_name | default(service_name) }}-grpc
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
+    nginx.ingress.kubernetes.io/proxy-body-size: "420m"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "10800"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "10800"
+    nginx.ingress.kubernetes.io/server-snippet: |
+      large_client_header_buffers 4 64k;
+      http2_max_header_size 64k;
+      http2_max_field_size 64k;
+      grpc_send_timeout 60m;
+      grpc_read_timeout 60m;
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: {{ edox_services[service_name].ingress_hostname }}
+      http:
+        paths:
+{% for p in edox_services[service_name].ingress_paths %}
+{% if p.type is defined and p.type == 'grpc' %}
+          - path: {{ p.path }}
+            pathType: {{ p.pathtype }}
+            backend:
+              service:
+                name: {{ edox_services[service_name].k8s_service_name | default(service_name) }}
+                port:
+                  number: {{ p.backend_port }}
+{% endif %}
+{% endfor %}

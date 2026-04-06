@@ -1,0 +1,9 @@
+﻿#db source
+source_connection_string:
+  finamedo:
+    connection: "Server=MSK-BOFU01-DB01;Database=Tracing;User Id=BOFU01-Tracing-msql;Password=*****;TrustServerCertificate=true"
+    db_type: "SqlServer"
+    db_name: "finamedo"
+
+#db receiver
+clickhouse_connection_string: "Host=msa-telr01-ch02.office.firm.ru;Protocol=http;Port=8123;Username=Edou01_edox_ch;Password=*********"

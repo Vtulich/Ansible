@@ -1,0 +1,21 @@
+﻿apiVersion: v1
+kind: Service
+metadata:
+  name: {{ edox_services[service_name].k8s_service_name | default(service_name) }}
+  labels:
+    app.kubernetes.io/name: {{ edox_services[service_name].k8s_service_name | default(service_name) }}
+    PrometheusMetrics: enabled
+spec:
+  selector:
+    app.kubernetes.io/component: {{ edox_services[service_name].k8s_selector_label | default(service_name) }}
+  ports:
+    - name: http
+      protocol: TCP
+      port: {{ edox_services[service_name].ports.http.external }}
+      targetPort: {{ edox_services[service_name].ports.http.internal }}
+{% if edox_services[service_name].ports.grpc is defined %}
+    - name: grpc
+      protocol: TCP
+      port: {{ edox_services[service_name].ports.grpc.external }}
+      targetPort: {{ edox_services[service_name].ports.grpc.internal }}
+{% endif %}

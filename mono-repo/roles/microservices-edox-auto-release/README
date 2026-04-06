@@ -1,0 +1,256 @@
+﻿## TeamCity
+[https://ci.firm.ru/project/ASO_Div_Edox_Edoauto?mode=builds](https://ci.firm.ru/project/ASO_Div_Edox_Edoauto?mode=builds)
+
+## Документация
+Описание сервисов, эксплуатация - [Wiki](https://wiki.firm.ru/pages/viewpage.action?pageId=308315093#id-26.2.1EDOX.%D0%A1%D0%B5%D1%80%D0%B2%D0%B8%D1%81%D1%8B-EDOAUTO)<br>
+Описание сервисов, разработка - [Wiki](https://wiki.firm.ru/pages/viewpage.action?pageId=383212939)
+
+## Vault agent
+### URL UI vault-server
+* UAT - [https://vault-uat.firm.ru/](https://vault-uat.firm.ru/)
+* PROD - [https://vault.firm.ru/](https://vault.firm.ru/)
+
+### Установка и настройка
+Описание - https://git.firm.ru/projects/ADID/repos/ansible_common/browse/vault_proxy<br>
+На билд серверах развернут как демон, на AP как docker контейнер. Потому что на билд серврах нет докера.<br>
+На билд серверах для UAT используется порт 8100, для PROD 8101
+
+### Правка конфигов vault-agent перед установкой
+### Daemon
+**vault_proxy/templates/config.hcl.j2**
+* role_id_file_path - меняем путь до roleid
+* secret_id_file_path - меняем путь до secretid
+* path - меняем путь до token_unwrapped
+* address - указываем на каком порту должен запускаться и работать vault-agent
+```
+auto_auth {
+   mounth_path = "auth/approle"
+   method "approle" {
+      config = {
+         role_id_file_path = "/opt/vault_proxy_prod_edox_auto/etc/roleid"
+         secret_id_file_path = "/opt/vault_proxy_prod_edox_auto/etc/secretid"
+      }
+   }
+
+   sink "file" {
+      config {
+          path = "/opt/vault_proxy_prod_edox_auto/.token_unwrapped"
+      }
+   }
+}
+
+listener "tcp" {
+   address     = "127.0.0.1:8101"
+   tls_disable = true
+}
+```
+**vault_proxy/defaults/main.yml**
+* vault_proxy_path - указываем путь, где будут расположены артефакты vault-agent
+* vault_server_remote_address - указываем к какому vault-server будет коннектится vault-agent для получения секретов
+* vault_proxy_roleid - указываем roleid полученную у DevOps
+* vault_proxy_secretid - указываем secretid полученную у DevOps
+
+```
+vault_proxy_path: "/opt/vault_proxy_prod_edox_auto"
+vault_server_remote_address: "https://vault.firm.ru"
+vault_proxy_roleid: "f35s2dd3-*-*-*-*"
+vault_proxy_secretid: "546fb382-*-*-*-*"
+```
+**vault_proxy/handlers/main.yml**
+* name - указываем имя сервиса
+```
+- name: Restart vault_proxy
+  ansible.builtin.service:
+    name: vault_proxy_prod_edox_auto
+    state: restarted
+```
+**vault_proxy/tasks/service.yml**
+* dest - меняем путь до сервиса vault-agent
+* name - указываем имя сервиса
+* notify - Указываем имя сервиса для рестарта
+```
+- name: Create vault_proxy service file
+  ansible.builtin.template:
+    src: vault_proxy.service.j2
+    dest: /etc/systemd/system/vault_proxy_prod_edox_auto.service
+    owner: root
+    group: root
+    mode: 0644
+  notify:
+    - Reload systemd
+    - Restart vault_proxy_prod_edox_auto
+
+- name: Flush handlers
+  ansible.builtin.meta: flush_handlers
+
+- name: Start and enable vault_proxy service
+  ansible.builtin.systemd:
+    name: vault_proxy_prod_edox_auto
+    state: started
+    enabled: true
+```
+**vault_proxy/playbook.yml**
+* vault_proxy_remote_address - указываем к какому vault-server будет коннектится vault-agent для получения секретов
+* vault_proxy_secretid - указываем secretid полученную у DevOps
+* vault_proxy_roleid - указываем roleid полученную у DevOps
+```
+  vars:
+    vault_proxy_remote_address: "https://vault.firm.ru"
+    vault_proxy_secretid: 546fb382-*-*-*-*
+    vault_proxy_roleid: f35s2dd3-*-*-*-*
+```
+### Docker
+Перебрасываем на сервер в папку /opt/docker/vault-agent/ из папки vault_proxy файлы ниже, эти файлы необходимы для полноценного запуска vault-agent
+* vault_proxy/docker-compose.yaml
+* vault_proxy/vault/vault-proxy-service-include.yaml
+* vault_proxy/vault/vault-proxy-service-init.sh
+
+**vault_proxy/docker-compose.yaml**
+* include - убираем лишнюю папку в пути, оставляем просто vault-proxy-service-include.yaml
+* networks.driver - Убираем эту строку, т.к. будет попытка создать сеть, хотя мы добавляем уже в существующую и меняем на - external: true
+* networks.name - меняем на свою сеть docker, где крутятся контейнеры с нашими приложениями
+```
+include:
+  - vault-proxy-service-include.yaml
+
+networks:
+  default:
+    external: true
+    name: skynet
+```
+**vault_proxy/vault/vault-proxy-service-include.yaml**
+* container_name - меняем на vault-agent
+* expose - меняем на нужный порт vault-agent
+* VAULT_SERVER_ADDRESS - указываем к какому vault-server будет коннектится vault-agent для получения секретов
+* VAULT_ROLE_ID - указываем roleid полученную у DevOps
+* VAULT_SECRET_ID - указываем secretid полученную у DevOps
+* vault{address} - указываем к какому vault-server будет коннектится vault-agent для получения секретов
+* listener "tcp" {address} - меняем на нужный порт vault-agent
+* mem_limit,cpus и logging - добавляем самостоятельно. mem_limit - лимит по памяти, cpus лимит по ядрам, logging для записи лога в файл по средствам rsyslog
+```
+services:
+  vault_proxy:
+    container_name: vault-agent
+    image: hashicorp/vault:1.18.1
+    expose:
+      - 8101
+    mem_limit: 1g
+    cpus: "1.0"
+    logging:
+      driver: syslog
+      options:
+        tag: "docker/{{.Name}}/{{.Name}}"
+    volumes:
+      - ./vault-proxy-service-init.sh:/init.sh
+    command: /bin/sh /init.sh
+    environment:
+      VAULT_SERVER_ADDRESS: "https://vault.firm.ru/"
+      VAULT_ROLE_ID: "f35s2dd3-*-*-*-*"
+      VAULT_SECRET_ID: "546fb382-*-*-*-*"
+      VAULT_LOCAL_CONFIG: '
+      vault {
+        address = "https://vault.firm.ru/"
+        tls_skip_verify = true
+      }
+
+      auto_auth {
+        method {
+          type = "approle"
+
+          config = {
+            role_id_file_path = "/config/roleid"
+            secret_id_file_path = "/config/secretid"
+            remove_secret_id_file_after_reading = false
+          }
+        }
+      }
+
+      listener "tcp" {
+        address     = "0.0.0.0:8101"
+        tls_disable = true
+      }
+
+      api_proxy {
+        use_auto_auth_token = true
+        enforce_consistency = "always"
+      }'
+    networks:
+      - default
+    restart: always
+```
+**vault_proxy/vault/vault-proxy-service-init.sh**
+* /config/roleid - указываем roleid полученную у DevOps
+* /config/secretid - указываем secretid полученную у DevOps
+```
+#!/bin/sh
+
+mkdir /config
+echo f35s2dd3-*-*-*-* > /config/roleid
+echo 546fb382-*-*-*-* > /config/secretid
+
+vault agent -config=/vault/config/
+```
+
+### Проверка статуса vault-agent сервиса
+#### Build сервера
+##### UAT
+```
+systemctl status vault_proxy_uat_edox_auto.service
+```
+##### PROD
+```
+systemctl status vault_proxy_prod_edox_auto.service
+```
+#### APP сервера
+```
+docker ps -a|grep vault-agent
+```
+
+## Переменные
+### Именование переменных
+#### Общее
+* Если мы объявили переменную на UAT, она так же должна выглядеть и на PROD. Бывают исключения, что на UAT(и наоборот) переменная есть и она необходима, на PROD в ней нет необходимости - например, потому что на PROD такой параметр не нужен - это ОК
+* Все переменные указываются через нижнее подчеркивание - "_", т.к. под капотом ansible находится Python(для *nix) и он не любит синтаксис с дефисом - "-"
+* Мы не объявляем переменную - если она используется ровно **ОДИН** раз и в одном месте. Переменные служат для их переиспользования, поэтому переменная объявляется только в том случае, если ее использует больше чем один проект/сервис или параметр необходим в нескольких местах одного конфига
+* Все переменные в ansible коде должны иметь алфавитную латинскую последовательность, это и выглядит солидно и искать глазами проще
+* Все переменные должны четко отвечать на вопросы
+  * кто? - Например signer, для чего? - Для коннекта к БД. Итого - signer_connection_string
+  * кто? - Например minio, для чего? - Для харения access_key сервиса file-accessor. Итого - minio_file_accessor_access_key
+#### Application
+* Переменные именуются начиная с имени сервиса, т.е. signer_..., report_converter_..., это облегчит понимание для чего нужна переменная и кем она используется<br>
+Пример - signer_connection_string. Понятно, что сервис signer и эта переменная служит для хранения информации о подключении к БД
+* Если необходимо объявить похожую переменную мы к текущему именованию переменной добавляем дополнительный префикс<br>
+Пример - signer_connection_string_bo. Понятно, что сервис signer и переменная служит для хранения информации о подключении к БД
+
+#### Infrastructure
+* Переменные именуются начиная с имени сервиса, т.е. sentry_..., minio_..., это облегчит понимание для чего нужна переменная и кем она используется<br>
+Пример - sentry_dsn. Понятно, что это общий проект sentry для хранения событий от сервисов/приложений
+* Если необходимо объявить похожую переменную мы к текущему именованию переменной добавляем дополнительный префикс<br>
+Пример - sentry_dsn_message_proxy. Понятно, что данный sentry dsn служит для хранения событий от сервиса message-proxy
+
+## Хранение переменных
+Все чувствительные данные должны находится в vault, либо consul, так же могут быть запоролены в системах CI/CD - https://wiki.firm.ru/pages/viewpage.action?pageId=523849384
+
+### Vault
+Место хранения чувствительных данных для UAT - [https://vault-uat.firm.ru/](https://vault-uat.firm.ru/ui/vault/secrets/project/kv/list/edox_auto/uat/)<br>
+Место хранения чувствительных данных для PROD - [https://vault.firm.ru/](https://vault.firm.ru/ui/vault/secrets/project/kv/list/edox_auto/prod/)
+
+* ansible_secrets - хранит все секреты и чувствительные данные, которые использует код ansible для выполнения свои задач
+* certs - хранит сертификаты/лого-пасс/etc, за которыми следит ИБ и они необходимы для работы приложений(например signer)
+* Остальные проекты разбиты по именованию сервиса и хранят в себе чувствительные данные конкретного сервиса
+
+### Consul
+Хранит в себе конфиги сервисов с чувствительными данными в открытом виде, которые не умеют работать с vault, пока это считается нормальным, но возможно в будущем все чувствительные данные должны будут переехать в Vault
+
+## Оформление PullRequest
+* **Плохо оформленный PR будет отклонен**
+* **PR должны аппрувнуть минимум два человека, после этого его можно смержить**
+* Должен содержать номер задачи - [DO-1081], [APPSUPPORT-3731]
+* Должен содержать environment - UAT, PROD, UAT/PROD(вносится изменение одновременно в конфиге для UAT и PROD сред)
+* Должен содержать имя сервиса или инфраструктурного компонента(если это предусмотрено изменениями в коде)
+* Должен содержать в себе описание для чего этот PR был открыт
+
+Мастер по PR - [DO-1081]. PROD. file-accessor. Монтируем SMB шару напрямую<br>
+Великолепно оформленный PR - [APPSUPPORT-3731]. UAT. Переезд в Vault<br>
+Хорошо оформленный PR - [DO-1478]. UAT/PROD. Релиз<br>
+Плохо оформленный PR - edox-lk-proxy.yml.j2 edited online with Bitbucket

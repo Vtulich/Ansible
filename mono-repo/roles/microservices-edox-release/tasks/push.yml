@@ -1,0 +1,5 @@
+﻿- name: Push config
+  community.general.consul_kv:
+    token: "{{ vault_secrets.consul_token }}"
+    key: "{{ consul_env_path }}/{{ data_center }}/{{ service_name }}/{{ service_version }}/appsettings"
+    value: "{{ lookup('ansible.builtin.template', 'templates/{{ env_code }}/{{ service_name }}.yml.j2').encode('utf-8').decode('unicode-escape') }}"

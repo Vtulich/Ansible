@@ -1,0 +1,32 @@
+﻿- name: Создаем папку для docker-compose файлов
+  ansible.builtin.file:
+    path: "{{ devops_compose_files_dir }}/{{ item }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: '755'
+  loop:
+    - minio
+    - minio-mc
+
+
+- name: Создаем композ файлы для сервисов
+  template:
+    src: "templates/docker-compose-{{ item }}.yml.j2"
+    dest: "{{ devops_compose_files_dir }}/{{ item }}/docker-compose-{{ item }}.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: '755'
+  loop:
+    - minio
+    - minio-mc
+
+- name: Запускаем сервисы
+  community.docker.docker_compose:
+    project_src: "{{ devops_compose_files_dir }}/{{ item }}"
+    recreate: always
+    files:
+    - docker-compose-{{ item }}.yml
+  loop:
+    - minio
+    - minio-mc

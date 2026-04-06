@@ -1,0 +1,14 @@
+﻿apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ edox_services[service_name].volume.pvc_name }}
+spec:
+  # Берём параметры из defaults -> volume
+  accessModes:
+{% for mode in edox_services[service_name].volume.access_modes | default(['ReadWriteOnce']) %}
+    - {{ mode }}
+{% endfor %}
+  resources:
+    requests:
+      storage: {{ edox_services[service_name].volume.size | default('100Mi') }}
+  storageClassName: {{ edox_services[service_name].volume.storage_class | default('longhorn') }}

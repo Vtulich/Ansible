@@ -1,0 +1,205 @@
+﻿- name: Включить переменные окружения
+  ansible.builtin.include_vars:
+    file: "vars/main.yml"
+
+- name: Получить задачи Jira
+  community.general.jira:
+    uri: "{{ jira_orange_url }}"
+    token: "{{ jira_token }}"
+    operation: "search"
+    jql: >
+      project = "{{ jira_project_key }}" AND
+      component = "{{ jira_component }}" AND
+      status NOT IN ({{ jira_exclude_statuses }}) AND
+      comment ~ "EDODB-*"
+    fields:
+      comment:
+  register: jira_issues
+
+- name: Проверить, если jira_issues пустая
+  ansible.builtin.set_fact:
+    no_jira_issues: "{{ jira_issues.meta.issues | length == 0 }}"
+
+- name: Отправить уведомление по электронной почте при отсутствии задач
+  mail:
+    host: "mail.firm.ru"
+    port: "25"
+    from: "TeamCity@corp.firm.ru"
+    to: "TestEnvManagers@corp.firm.ru,EDOX_WEB_QA@corp.firm.ru,EDO_ops@corp.firm.ru"
+    subject: "Обновление базы данных: результаты выполнения"
+    body: |
+      Добрый день!
+
+      Не удалось найти задачи JIRA, соответствующие критериям.
+
+      С уважением,
+      Автоматизированная система обновления БД
+    charset: utf-8
+  when: no_jira_issues
+  delegate_to: localhost
+
+- name: Извлечь все URL EDODB из комментариев
+  set_fact:
+    edodb_urls_temp: "{{ edodb_urls_temp | default([]) + (item.body | regex_findall('https://jira\\.firm\\.ru/browse/(EDODB-\\d+)')) | flatten }}"
+  loop: "{{ jira_issues.meta.issues | map(attribute='fields.comment.comments') | flatten(levels=1) }}"
+  loop_control:
+    loop_var: item
+  when: not no_jira_issues
+
+- name: Удалить дубликаты URL EDODB
+  set_fact:
+    edodb_urls: "{{ edodb_urls_temp | unique }}"
+  when: not no_jira_issues
+
+- name: Получаем список pull requests из Bitbucket
+  uri:
+    url: "{{ base_api_url }}/{{ project_name }}/repos/{{ db_name }}/pull-requests?limit=300"
+    headers:
+      Authorization: "Bearer {{ bitbucket_token }}"
+    method: GET
+    return_content: yes
+  register: pull_requests
+  loop: "{{ edodb_urls }}"
+  when: not no_jira_issues
+
+- name: Извлекаем имена веток PR, совпадающих с edodb_urls
+  set_fact:
+    all_pull_request_ids: "{{ all_pull_request_ids | default([]) + (pr_values | selectattr('fromRef.displayId', 'search', item_regex) | map(attribute='fromRef.displayId') | list) }}"
+  vars:
+    item_regex: "{{ edodb_urls | join('|') }}"
+    pr_values: "{{ item['json']['values'] }}"
+  loop: "{{ pull_requests.results }}"
+  loop_control:
+    loop_var: item
+  when: not no_jira_issues
+
+- name: Удалить дубликаты из списка PR
+  set_fact:
+    unique_pull_request_ids: "{{ all_pull_request_ids | unique }}"
+  when: not no_jira_issues
+
+- name: Удалить существующие директории, если они есть
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /tmp/db.finamedo
+    - /tmp/pr_changes
+  when: not no_jira_issues
+
+- name: Вытаскиваем изменения из PR
+  shell: |
+    # Выкачиваем репозиторий
+    cd /tmp
+    git clone {{ git_repo }}
+    cd {{ db_name }}
+
+    # Переключитесь на нужную ветку
+    git fetch origin
+    git checkout {{ item }}
+    
+    # Собираем изменения из PR в файл
+    git diff --name-only --diff-filter=ACM origin/master...HEAD > pr_files.txt
+    
+    # Создаем директорию для хранения всех изменений
+    mkdir -p "/tmp/pr_changes/{{ item }}"
+    
+    # Складываем файлы из PR
+    while IFS= read -r file; do
+        if [ -e "$file" ]; then
+            # Создаем директорию для каждого файла
+            mkdir -p "/tmp/pr_changes/{{ item }}/$(dirname "$file")"
+            # Копируем файл в соответствующую директорию
+            cp "$file" "/tmp/pr_changes/{{ item }}/$file"
+        else
+            echo "Файл '$file' не найден."
+        fi
+    done < pr_files.txt
+  loop: "{{ unique_pull_request_ids }}"
+  loop_control:
+    loop_var: item
+  when:
+    - not no_jira_issues
+    - unique_pull_request_ids | length > 0
+
+- name: Найти все SQL файлы
+  find:
+    paths: "/tmp/pr_changes/"
+    patterns: "*.sql"
+    recurse: yes
+  register: found_sql_files
+  when: not no_jira_issues
+
+- name: Удалить BOM из SQL файлов с помощью sed
+  shell: >
+    sed -i -e 's/\xEF\xBB\xBF//' "{{ item.path }}"
+  loop: "{{ found_sql_files.files }}"
+  when:
+    - not no_jira_issues
+    - found_sql_files.matched > 0
+
+- name: Выполнить скрипты на MSSQL
+  community.general.mssql_script:
+    login_host: "{{ db_host }}"
+    login_port: "1433"
+    login_user: "{{ finam_edo_login }}"
+    login_password: "{{ finam_edo_password }}"
+    db: "{{ finam_edo_db_name }}"
+    script: "{{ lookup('file', item.path) }}"
+  loop: "{{ found_sql_files.files }}"
+  when:
+    - not no_jira_issues
+    - found_sql_files.matched > 0
+
+- name: Вытащить ключи DO из JIRA issues
+  set_fact:
+    do_keys: "{{ jira_issues.meta.issues | map(attribute='key') | list }}"
+  when: not no_jira_issues
+
+- name: Отправить уведомление по электронной почте
+  mail:
+    host: "mail.firm.ru"
+    port: "25"
+    from: "TeamCity@corp.firm.ru"
+    to: "TestEnvManagers@corp.firm.ru,EDOX_WEB_QA@corp.firm.ru,EDO_ops@corp.firm.ru"
+    subject: "Обновление базы данных: результаты выполнения"
+    body: |
+      Добрый день!
+      
+      Вы всегда можете запустить меня руками - https://ci.firm.ru/buildConfiguration/ASO_Div_Edox_AutodeployDbUat_AutodeployDb
+      
+      Были найдены следующие DO подходящие под критерии:
+      {% for do_key in do_keys %}
+      - Задача: https://support.firm.ru/browse/{{ do_key }}
+      {% endfor %}
+      
+      Были просканированы следующие задачи, на наличие Pull Requests:
+        {% for edodb_url in edodb_urls %}
+        - Задача JIRA: https://jira.firm.ru/browse/{{ edodb_url }}
+        {% endfor %}
+
+      Были найдены следующие Pull Requests во всех просканированных EDODB:
+      {% if unique_pull_request_ids %}
+        {% for pr_id in unique_pull_request_ids %}
+        - PR: {{ pr_id }}
+        {% endfor %}
+      {% else %}
+        -
+      {% endif %}
+      
+      Из найденных Pull request были выполнены следующие скрипты:
+      {% if found_sql_files.files %}
+        {% for file_info in found_sql_files.files %}
+          {% if file_info.path.endswith('.sql') %}
+          - Наименование скрипта: {{ file_info.path | basename }}
+          {% endif %}
+        {% endfor %}
+      {% else %}
+        -
+      {% endif %}
+      
+      С уважением,
+      Автоматизированная система обновления БД
+    charset: utf-8
+  when: not no_jira_issues
+  delegate_to: localhost

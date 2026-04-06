@@ -1,0 +1,52 @@
+﻿---
+- name: Импортируем чувствительные переменные из Vault
+  block:
+    - name: Читаем Vault токен
+      become: true
+      slurp:
+        src: "/opt/{{ vault_agent_name_directory }}/.token_unwrapped"
+      register: vault_token
+
+    - name: Получаем секреты из Vault
+      set_fact:
+        vault_secrets: "{{ lookup('community.hashi_vault.hashi_vault',
+                                  vault_ansible_secret_path,
+                                  url=vault_agent_api_url,
+                                  token=(vault_token.content | b64decode)) }}"
+  delegate_to: localhost
+
+- name: Inclusion of environment variables
+  ansible.builtin.include_vars:
+    file: "{{ env_code }}.yml"
+
+- name: Creating the requires directories or files
+  include_tasks: prepare.yml
+
+- name: Push configs for "app" microservice
+  include_tasks: push.yml
+  when: (inventory_hostname in groups['application_servers']) and
+        (rollback_release is not defined or rollback_release != "True")
+
+- name: Recreate container
+  community.docker.docker_container:
+    name: "{{ service_name }}"
+    image: "edox-docker-local.artifact.firm.ru/{{ service_name }}:{{ service_version }}"
+    published_ports: "{{ edox_services[service_name]['ports'] }}"
+    restart_policy: unless-stopped
+    cpus: "{{ edox_services[service_name]['cpu'] | default(2) }}"
+    memory: "{{ edox_services[service_name]['memory'] | default('1g') }}"
+    log_driver: "{{ docker_logging_driver }}"
+    log_options:
+      syslog-address: "{{ docker_syslog_address }}"
+      tag: "{{ docker_logging_tag }}"
+    recreate: true
+    volumes: "{{ edox_services[service_name]['volumes'] | default(omit) }}"
+    env: "{{ edox_services[service_name]['env'] }}"
+    networks:
+      - name: "{{ docker_network_name }}"
+
+- name: Creating docker-compose file with description for view
+  include_tasks: create_compose.yml
+  
+    
+

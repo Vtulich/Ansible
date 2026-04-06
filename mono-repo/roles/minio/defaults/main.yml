@@ -1,0 +1,43 @@
+﻿port_api: 9000
+port_ui: 9001
+host_volume: /var/minio
+docker_volume: /data
+minio_admin_user: minio_user
+minio_admin_password: *****
+prometheus_job: minio_s3_storage
+prometheus_auth_type: public
+
+ad_user_connect: EDOR02-Minio-AD-s
+ad_user_password: *******
+
+services:
+  uat_minio_blobstore:
+    ad_group_admin: ROL-EDO_ops-NProd-admin
+    user_minio: edou01-blob-minio-s
+    bucket_name: blobstor
+
+  prod_minio_blobstore:
+    ad_group_admin: ROL-EDO_ops-Prod-admin
+    user_minio: edor02-blob-minio-s
+    bucket_name: blobstor
+
+  uat_minio_file_accessor_certificates:
+    ad_group_admin: ROL-EDO_ops-NProd-admin
+    user_minio: BOFU01-EDOX-MinIO-s
+    bucket_name: edoxauto-gift-certificates
+
+  prod_minio_file_accessor_certificates:
+    ad_group_admin: ROL-EDO_ops-Prod-admin
+    user_minio: BOAOR1-EDOX-MinIO-s
+    bucket_name: edoxauto-gift-certificates
+
+  uat_minio_federal_financial_monitoring:
+    ad_group_admin: ROL-EDO_ops-NProd-admin
+    user_minio: BOFU01-EDOX-MinIO-s
+    bucket_name: federal-financial-monitoring
+
+  prod_minio_federal_financial_monitoring:
+    ad_group_admin: ROL-EDO_ops-Prod-admin
+    user_minio: BOAOR1-EDOX-MinIO-s
+    bucket_name: federal-financial-monitoring
+  

@@ -1,0 +1,17 @@
+﻿deploy_user: edox-cicd-s
+deploy_group: root
+devops_compose_files_dir: /opt/docker
+docker_logging_driver: syslog
+docker_logging_tag:  "{%raw%}docker/{{.Name}}/{{.Name}}{%endraw%}"
+docker_logging_dir: "/var/log/docker"
+docker_syslog_address: udp://127.0.0.1:10514
+env_code: prod
+env_docker: "production"
+consul_env_code: prd-edor02
+consul_env_path: prd/edor02
+docker_network_name: edox
+dotnet_environment: "Production"
+service_grpc_common_name: https://edox-grpc.firm.ru
+vault_agent_api_url: "http://127.0.0.1:8103"
+vault_agent_name_directory: "vault_proxy_prod_edox_web"
+vault_ansible_secret_path: "project/data/edox_web/{{ env_code }}/ansible_secrets"

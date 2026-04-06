@@ -1,0 +1,5 @@
+﻿- name: Deploy edox microservices
+  hosts: "{{ target_server_name }}"
+  gather_facts: no
+  roles:
+    - microservices-edox-release

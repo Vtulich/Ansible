@@ -1,0 +1,16 @@
+﻿#ANSIBLE CONFIG GLOBAL
+#connection
+ansible_user: "edox-cicd-s@OFFICE.firm.ru"
+ansible_password: "********" #Временно, что бы не мешать деплоям
+ansible_connection: winrm
+ansible_port: 5985
+#transport
+ansible_winrm_transport: kerberos
+ansible_become: false
+os: win
+
+ca_path: "D:/"
+
+path_to_artifacts:        "D:/artifacts/{{ site_name }}/{{ release_type }}"
+path_to_inetpub_basepath: "D:/inetpub"
+

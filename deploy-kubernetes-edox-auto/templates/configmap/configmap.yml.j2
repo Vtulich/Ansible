@@ -1,0 +1,39 @@
+﻿apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ service_name }}
+data:
+# Базовые переменные, которые требуются всем сервисам
+  DOTNET_ENVIRONMENT: "{{ dotnet_environment }}"
+  GRPC_DNS_RESOLVER: native
+  ConsulSettings__ServiceHost: "$(SERVICE_HOST)"
+  ConsulSettings__ConsulEndpoint: "{{ consul_host }}"
+# Для переиспользования переменных из default - message-proxy*
+  ConsulSettings__ConfigPrefix: "{{ edox_services[service_name].consul_env_path | default(consul_env_path) }}"
+  ConsulSettings__ServiceName: "{{ edox_services[service_name].consul_service_name | default(service_name) }}"
+  ConsulSettings__SettingsName: "{{ service_version }}/settings.{{ service_config_version }}"
+# Для переиспользования переменных из default - message-proxy*
+  ConsulSettings__ServicePrefix: "{{ edox_services[service_name].consul_env_code | default(consul_env_code) }}"
+  ConsulSettings__ServiceIdSuffix: "{{ edox_services[service_name].consul_service_id_suffix | default(consul_service_id_suffix) }}"
+  ConsulSettings__HealthCheckServiceHost: "$(SERVICE_HOST)"
+  ConsulSettings__HttpPort: "{{ edox_services[service_name].ports.http.internal }}"
+  ConsulSettings__HealthCheckHttpPort: "{{ edox_services[service_name].ports.http.internal }}"
+{% if edox_services[service_name].ports.grpc is defined and not edox_services[service_name].exclude_healthcheck_grpc_port | default(false) %}
+  ConsulSettings__GrpcPort: "{{ edox_services[service_name].ports.grpc.internal }}"
+  ConsulSettings__HealthCheckGrpcPort: "{{ edox_services[service_name].ports.grpc.internal }}"
+{% endif %}
+  OTEL_RESOURCE_ATTRIBUTES: "host.name=$(NODE_NAME)"
+  OTEL_SDK_DISABLED: 'false'
+  OTEL_EXPORTER_OTLP_ENDPOINT: '{{ otel_collector_ep }}'
+  OTEL_EXPORTER_HEALTHCHECK_ENDPOINT: '{{ otel_collector_hc }}'
+
+# Дополнительные переменные
+{% if edox_services[service_name].env is defined %}
+{% for item in edox_services[service_name].env | dict2items %}
+#Для CryptoPro лицензий
+{% if env_code == 'prod' and item.key in ['CRYPTO_PRO_KEY', 'CRYPTO_PRO_LICENSE_KEY'] %}
+{% else %}
+  {{ item.key }}: "{{ item.value }}"
+{% endif %}
+{% endfor %}
+{% endif %}

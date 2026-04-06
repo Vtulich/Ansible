@@ -1,0 +1,6 @@
+﻿- name: Запуск роли для сайтов в монолите ЭДО
+  hosts: "{{ target_server_name }}"
+  gather_facts: no
+  roles:
+    - monolith-deploy-site
+

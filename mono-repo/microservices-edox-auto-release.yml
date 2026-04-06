@@ -1,0 +1,5 @@
+﻿- name: Запуск роли для микросервисов edox auto
+  hosts: "{{ target_server_name }}"
+  gather_facts: no
+  roles:
+    - microservices-edox-auto-release

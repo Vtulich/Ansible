@@ -1,0 +1,54 @@
+﻿apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ service_name }}
+  labels:
+    app.kubernetes.io/name: {{ service_name }}
+spec:
+  replicas: {{ edox_services[service_name]['count_replicas'] | default(2) }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ service_name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ service_name }}
+    spec:
+      restartPolicy: Always
+      containers:
+        - name: {{ service_name }}
+          image: edox-docker-local.artifact.firm.ru/{{ service_name }}:{{ service_version }}
+          ports:
+{% for port in edox_services[service_name]['ports'] %}
+            - name: {{ port.name }}
+              containerPort: {{ port.internal }}
+              protocol: TCP
+{% endfor %}
+          resources:
+            limits:
+              cpu: "{{ edox_services[service_name]['cpu'] | default('400m') }}"
+              memory: "{{ edox_services[service_name]['memory'] | default('500Mi') }}"
+            requests:
+              cpu: "{{ edox_services[service_name]['cpu'] | default('400m') }}"
+              memory: "{{ edox_services[service_name]['memory'] | default('500Mi') }}"
+          envFrom:
+            - configMapRef:
+                name: {{ service_name }}
+          env:
+            - name: SERVICE_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: Consul__ServiceHost
+              value: "$(SERVICE_HOST)"
+            - name: "NODE_NAME"
+              valueFrom:
+                fieldRef:
+                  fieldPath: "spec.nodeName"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "host.name=$(NODE_NAME)"
+            - name: CONSUL_HTTP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: consul-http-token
+                  key: CONSUL_HTTP_TOKEN

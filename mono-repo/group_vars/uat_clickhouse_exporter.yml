@@ -1,0 +1,5 @@
+﻿env_code: uat
+consul_env_path: pp/edou01
+consul_env_code: pp-edou01
+consul_token: *******
+

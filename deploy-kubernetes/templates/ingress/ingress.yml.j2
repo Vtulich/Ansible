@@ -1,0 +1,514 @@
+﻿apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: edox-accounts-v1
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /v1/tariffs/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-accounts
+                port:
+                  number: 6606
+          - path: /v1/accounts/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-accounts
+                port:
+                  number: 6606
+          - path: /v1/bank-details
+            pathType: Exact
+            backend:
+              service:
+                name: edox-accounts
+                port:
+                  number: 6606
+          - path: /v1/money-out/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-accounts
+                port:
+                  number: 6606
+          - path: /v1/tariffs
+            pathType: Exact
+            backend:
+              service:
+                name: edox-accounts
+                port:
+                  number: 6606
+          - path: /v1/account/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-accounts
+                port:
+                  number: 6606
+          - path: /v1/accounts
+            pathType: Exact
+            backend:
+              service:
+                name: edox-accounts
+                port:
+                  number: 6606
+          - path: /v1/bank-accounts/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-accounts
+                port:
+                  number: 6606
+          - path: /v1/broker-accounts
+            pathType: Exact
+            backend:
+              service:
+                name: edox-accounts
+                port:
+                  number: 6606
+          - path: /v1/contracts
+            pathType: Exact
+            backend:
+              service:
+                name: edox-accounts
+                port:
+                  number: 6606
+          - path: /v1/delayed-calculations
+            pathType: Exact
+            backend:
+              service:
+                name: edox-accounts
+                port:
+                  number: 6606
+          - path: /v1/forex/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-accounts
+                port:
+                  number: 6606
+          - path: /v1/payment/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-accounts
+                port:
+                  number: 6606
+          - path: /v1/risk/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-accounts
+                port:
+                  number: 6606
+          - path: /v1/top-up/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-accounts
+                port:
+                  number: 6606
+          - path: /v1/transfer/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-accounts
+                port:
+                  number: 6606
+          - path: /v1/contract/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-accounts
+                port:
+                  number: 6606
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: edox-address-v1
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /v1/address/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-address
+                port:
+                  number: 6610
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: edox-clientdata-v1
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /v1/clients
+            pathType: Exact
+            backend:
+              service:
+                name: edox-clientdata
+                port:
+                  number: 6630
+          - path: /v1/clients/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-clientdata
+                port:
+                  number: 6630
+          - path: /v1/clientdata/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-clientdata
+                port:
+                  number: 6630
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: edox-confirmation-v1
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /v1/confirmations/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-confirmation
+                port:
+                  number: 6605
+          - path: /v1/confirmations
+            pathType: Exact
+            backend:
+              service:
+                name: edox-confirmation
+                port:
+                  number: 6605
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: edox-dos-api-open-v1
+spec:
+  rules:
+    - host: {{ ingress_name_edox_api_open }}
+      http:
+        paths:
+          - path: /v1/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-dos
+                port:
+                  number: 6609
+          - path: /swagger/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-dos
+                port:
+                  number: 6609
+          - path: /hc
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-dos
+                port:
+                  number: 6609
+          - path: /healthmetrics
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-dos
+                port:
+                  number: 6609
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: edox-dos-external-v1
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /v1/orders/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-dos-external
+                port:
+                  number: 6643
+          - path: /v1/orders
+            pathType: Exact
+            backend:
+              service:
+                name: edox-dos-external
+                port:
+                  number: 6643
+          - path: /v1/documents/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-dos-external
+                port:
+                  number: 6643
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: edox-finances-v1
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /v1/sbp/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-finances
+                port:
+                  number: 6631
+          - path: /api/v1/sbp/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-finances
+                port:
+                  number: 6631
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: edox-journals-v1
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /v1/union-journal-documents
+            pathType: Exact
+            backend:
+              service:
+                name: edox-journals
+                port:
+                  number: 6619
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: edox-lk-api-v1
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /v1/stocks/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-lk-api
+                port:
+                  number: 6648
+          - path: /v1/bonds/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-lk-api
+                port:
+                  number: 6648
+          - path: /v1/privileges/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-lk-api
+                port:
+                  number: 6648
+          - path: /v1/ndflrecalculation/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-lk-api
+                port:
+                  number: 6648
+          - path: /v1/securities/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-lk-api
+                port:
+                  number: 6648
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: edox-productopening-v1
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /v1/product-open-url
+            pathType: Exact
+            backend:
+              service:
+                name: edox-productopening
+                port:
+                  number: 6647
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: edox-productorder-v1
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /v1/productorder/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-productorder
+                port:
+                  number: 6620
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: edox-publicquestionnaire-admin
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: GRPC
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /grpc.edox.publicquestionnaire.admin.PublicQuestionnaireAdminApi/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-publicquestionnaire
+                port:
+                  number: 5541
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: edox-publicquestionnaire-v1
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /v1/link
+            pathType: Exact
+            backend:
+              service:
+                name: edox-publicquestionnaire
+                port:
+                  number: 6640
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: edox-securities-v1
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /v1/depositary-accounts
+            pathType: Exact
+            backend:
+              service:
+                name: edox-securities
+                port:
+                  number: 6624
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: edox-taxes-v1
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /v1/taxes/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-taxes
+                port:
+                  number: 6622
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: edox-urlshortener-v1
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /v1/shorten-link
+            pathType: Exact
+            backend:
+              service:
+                name: edox-urlshortener
+                port:
+                  number: 6645
+          - path: /v1/shorten-links
+            pathType: Exact
+            backend:
+              service:
+                name: edox-urlshortener
+                port:
+                  number: 6645
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: edox-userprofile-v1
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /v1/userinfo/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-userprofile
+                port:
+                  number: 6660
+          - path: /v1/userinfo
+            pathType: Exact
+            backend:
+              service:
+                name: edox-userprofile
+                port:
+                  number: 6660
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: edox-notification-v1
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /v1/push-settings/
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: edox-notification
+                port:
+                  number: 6603
+          - path: /v1/push-settings
+            pathType: Exact
+            backend:
+              service:
+                name: edox-notification
+                port:
+                  number: 6603

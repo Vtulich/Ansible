@@ -1,0 +1,38 @@
+﻿- name: Инклюдим переменные из vars
+  ansible.builtin.include_vars:
+    file: "{{ env_code }}.yml"
+
+- name: PUSH consul конфига
+  community.general.consul_kv:
+    key: "{{ consul_env_path }}/{{ data_center }}/{{ service_name }}/settings.{{ service_config_version }}"
+    value: "{{ lookup('template', 'templates/consul/{{ service_name }}.yml.j2') | string }}"
+    token: "{{ consul_token }}"
+
+- name: Создаем папку
+  ansible.builtin.file:
+    path: "{{ devops_compose_files_dir }}/{{ service_name }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: '755'
+
+- name: Создаем композ файл
+  template:
+    src: "templates/docker-compose.yml.j2"
+    dest: "{{ devops_compose_files_dir }}/{{ service_name }}/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: '755'
+
+- name: Запуск docker-compose файл
+  community.docker.docker_compose:
+    project_src: "/opt/docker/{{ service_name }}"
+    state: present
+
+- name: Останавливаем контейнер, на резерве
+  community.docker.docker_container:
+    name: "{{ service_name }}"
+    state: stopped
+  when:
+    - data_center == "msm"
+    - service_name == "clickhouse-exporter"

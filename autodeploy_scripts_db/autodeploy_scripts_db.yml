@@ -1,0 +1,5 @@
+﻿- name: Запуск Роли
+  hosts: localhost
+  gather_facts: no
+  roles:
+    - autodeploy_scripts_db

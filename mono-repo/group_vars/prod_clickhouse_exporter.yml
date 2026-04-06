@@ -1,0 +1,4 @@
+﻿env_code: prod
+consul_env_code: prd-edor02
+consul_env_path: prd/edor02
+consul_token: *******

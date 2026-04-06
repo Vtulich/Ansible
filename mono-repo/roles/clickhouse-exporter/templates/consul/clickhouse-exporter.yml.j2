@@ -1,0 +1,36 @@
+﻿Serilog:
+  MinimumLevel:
+    Default: 'Information'
+    Override:
+      Microsoft: 'Warning'
+      Microsoft.Hosting.Lifetime: 'Information'
+      Microsoft.AspNetCore.DataProtection: 'Error'
+  WriteTo:
+  - Name: 'Console'
+    Args:
+      formatter: 'FortyTwo.Logging.CustomJsonFormatter, FortyTwo.Logging'
+PipelineSettings:
+  RequestPause: '00:00:05'
+ReceiverSettings:
+  ConnectionString: '{{ source_connection_string[db_name].connection }}'
+  DbType: '{{ source_connection_string[db_name].db_type }}'
+  Query: >
+    SELECT
+    [Timestamp] = [DateStartUTC],
+    [TraceId] = [TraceID],
+    [SpanId] = [SpanID],
+    [ParentSpanId] = [ParentID],
+    [SpanName] = [Name],
+    [SpanKind] = 'SPAN_KIND_INTERNAL',
+    [ServiceName] = '{{ source_connection_string[db_name].db_name }}',
+    [ScopeName] = 'sqlserver',
+    [Duration] = DATEDIFF(MILLISECOND, [DateStartUTC], [DateEndUTC]),
+    [StatusCode] = IIF([Status] = 'OK', 'STATUS_CODE_OK', 'STATUS_CODE_ERROR') 
+    FROM [Trace].[Span:Records]
+  IdColumn: 'RecordID'
+  BatchSize: 1000
+ClickHouseSettings:
+  ConnectionString: '{{ clickhouse_connection_string }}'
+  Table: 'fotel.otel_traces'
+TrackingSettings:
+  StartAt: 4648871

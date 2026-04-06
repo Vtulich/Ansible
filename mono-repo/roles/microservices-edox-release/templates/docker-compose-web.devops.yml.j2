@@ -1,0 +1,14 @@
+﻿version: '3'
+
+services:
+  web:
+    environment:
+{% for env_variable in edox_services[service_name]['env'] %}
+      - {{ env_variable }}={{ edox_services[service_name]['env'][env_variable] }} 
+{% endfor %}
+{% if edox_services[service_name]['volumes'] is defined %}
+    volumes:
+{% for volume in edox_services[service_name]['volumes'] %}
+      - {{ volume }}
+{% endfor %}
+{% endif %}

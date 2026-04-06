@@ -1,0 +1,13 @@
+﻿apiVersion: v1
+kind: Service
+metadata:
+  name: digital-profile
+  labels:
+    app.kubernetes.io/name: digital-profile
+spec:
+  type: ExternalName
+  externalName: msa-edou01-ap06.office.firm.ru
+  ports:
+    - port: 17401
+      protocol: TCP
+      targetPort: 17401

@@ -1,0 +1,96 @@
+﻿apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ service_name }}
+  labels:
+    app.kubernetes.io/name: {{ service_name }}
+    app.kubernetes.io/component: {{ edox_services[service_name].k8s_selector_label | default(service_name) }}
+spec:
+  replicas: {{ edox_services[service_name]['count_replicas'] | default(2) }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ service_name }}
+      app.kubernetes.io/component: {{ edox_services[service_name].k8s_selector_label | default(service_name) }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ service_name }}
+        app.kubernetes.io/component: {{ edox_services[service_name].k8s_selector_label | default(service_name) }}
+    spec:
+      restartPolicy: Always
+      containers:
+        - name: {{ service_name }}
+          image: "{{ edox_services[service_name].special_image | default(default_image) }}"
+          ports:
+            - name: http
+              containerPort: {{ edox_services[service_name].ports.http.internal }}
+              protocol: TCP
+{% if edox_services[service_name].ports.grpc is defined %}
+            - name: grpc
+              containerPort: {{ edox_services[service_name].ports.grpc.internal }}
+              protocol: TCP
+{% endif %}
+          resources:
+            limits:
+              cpu: "{{ edox_services[service_name]['cpu'] | default('400m') }}"
+              memory: "{{ edox_services[service_name]['memory'] | default('500Mi') }}"
+          envFrom:
+            - configMapRef:
+                name: {{ service_name }}
+          env:
+            - name: SERVICE_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: ConsulSettings__HealthCheckServiceHost
+              value: "$(SERVICE_HOST)"
+            - name: ConsulSettings__ServiceHost
+              value: "$(SERVICE_HOST)"
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "host.name=$(NODE_NAME)"
+            - name: CONSUL_HTTP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: consul-http-token
+                  key: CONSUL_HTTP_TOKEN
+
+{% if edox_services[service_name].certificates is defined or edox_services[service_name].volume is defined %}
+          # Монтируем дополнительные ресурсы (сертификаты / постоянное хранилище)
+          volumeMounts:
+{% if edox_services[service_name].certificates is defined %}
+            # Смотри defaults → certificates
+            - name: {{ service_name }}-certs
+              mountPath: {{ edox_services[service_name].certificates.mount_path }}
+              readOnly: true
+{% endif %}
+{% if edox_services[service_name].volume is defined %}
+            # Смотри defaults → volume (Longhorn / PVC)
+            - name: {{ service_name }}-data
+              mountPath: {{ edox_services[service_name].volume.mount_path }}
+{% endif %}
+{% endif %}
+
+{% if edox_services[service_name].certificates is defined or edox_services[service_name].volume is defined %}
+      volumes:
+{% if edox_services[service_name].certificates is defined %}
+        # Прокидываем секрет с сертификатами во внутрь контейнера
+        - name: {{ service_name }}-certs
+          secret:
+            secretName: {{ edox_services[service_name].certificates.secret_name }}
+            items:
+{% for item in edox_services[service_name].certificates.files | dict2items %}
+              - key: {{ item.key }}
+                path: {{ item.value.path }}
+{% endfor %}
+{% endif %}
+{% if edox_services[service_name].volume is defined %}
+        # Подключаем PersistentVolumeClaim для хранения состояния
+        - name: {{ service_name }}-data
+          persistentVolumeClaim:
+            claimName: {{ edox_services[service_name].volume.pvc_name }}
+{% endif %}
+{% endif %}

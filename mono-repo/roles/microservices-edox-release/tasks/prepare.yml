@@ -1,0 +1,34 @@
+﻿---
+- name: Creating directory for docker-compose files
+  ansible.builtin.file:
+    path: "{{ devops_compose_files_dir }}/{{ service_name }}"
+    state: directory
+    mode: '755'
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+
+- block:
+  - name: Creating directory for web-services configs
+    ansible.builtin.file:
+      path: "{{ devops_compose_files_dir }}/{{ service_name }}/config/js"
+      state: directory
+      mode: '755'
+      owner: "{{ deploy_user }}"
+      group: "{{ deploy_group }}"
+  - name: Create appsettings file for web-services
+    template: 
+      src: "{{ env_code }}/{{ service_name }}.json.j2"
+      dest: "{{ devops_compose_files_dir }}/{{ service_name }}/config/js/appsettings.json"
+      owner: "{{ deploy_user }}"
+      group: "{{ deploy_group }}"
+      mode: '755'
+  when: (inventory_hostname in groups['web_servers'])
+
+- name: Creating directory for logs
+  ansible.builtin.file:
+    path: "{{ docker_logging_dir }}/{{ service_name }}"
+    state: directory
+    mode: '755'
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+

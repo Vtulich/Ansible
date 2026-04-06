@@ -1,0 +1,39 @@
+﻿apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: edox-logins-storage-reinitialize-storage
+spec:
+  schedule: "0 6 * * *"  # 06:00 UTC = 09:00 MSK ежедневно
+  concurrencyPolicy: Forbid  # Не запускать параллельно
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 10 # сколько раз ретраить Job при неудаче
+      ttlSecondsAfterFinished: 39600 # Время жизни Jobs
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: edox-logins-storage-reinitialize-storage
+            image: alpine:3.22
+            imagePullPolicy: IfNotPresent
+            command:
+                - /bin/sh
+                - '-c'
+                - |
+                  apk add --no-cache curl tar >/dev/null && \
+                  curl -fsSL https://github.com/fullstorydev/grpcurl/releases/download/v1.9.1/grpcurl_1.9.1_linux_x86_64.tar.gz \
+                    | tar -xz -C /usr/local/bin grpcurl && \
+                  grpcurl -plaintext -d '{}' "${GRPC_HOST}:${GRPC_PORT}" \
+                    grpc.edox.logins.storage.LoginsStorageApi/ReinitializeStorage \
+                  | tee /dev/stderr | grep -q "Хранилище переинициализировано"
+            env:  # Переменные для конфигурации (можно задать здесь или в скрипте)
+            - name: GRPC_HOST
+              value: "edox-logins-storage.{{ vault_secrets.namespacek8s }}.svc.cluster.local"  # Полный домен сервиса в кластере
+            - name: GRPC_PORT
+              value: "5536"  # Порт GRPC
+            resources:
+              limits:
+                cpu: "100m"
+                memory: "128Mi"

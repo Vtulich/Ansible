@@ -1,0 +1,34 @@
+﻿apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ edox_services[service_name].k8s_service_name | default(service_name) }}-http
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "420m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "100"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "100"
+    nginx.ingress.kubernetes.io/server-snippet: |
+      large_client_header_buffers 4 64k;
+      client_header_buffer_size 8k;
+#Активация websocket - websocket_enabled, смотри defaults/main.yml
+{% if edox_services[service_name].websocket_enabled | default(false) %}
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+{% endif %}
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: {{ edox_services[service_name].ingress_hostname }}
+      http:
+        paths:
+{% for p in edox_services[service_name].ingress_paths %}
+{% if p.type is not defined or p.type != 'grpc' %}
+          - path: {{ p.path }}
+            pathType: {{ p.pathtype }}
+            backend:
+              service:
+                name: {{ edox_services[service_name].k8s_service_name | default(service_name) }}
+                port:
+                  number: {{ p.backend_port }}
+{% endif %}
+{% endfor %}

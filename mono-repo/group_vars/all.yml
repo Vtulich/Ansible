@@ -1,0 +1,23 @@
+﻿ansible_user: "edox-cicd-s@office.firm.ru"
+ansible_password: "*******"
+ansible_connection: ssh
+ansible_port: 22
+ansible_become: true
+ansible_python_interpreter: /usr/bin/python3
+remote_user: edox-cicd-s
+become_user: root
+become: true
+become_method: sudo
+os : linux
+
+devops_compose_files_dir: /opt/docker
+devops_base_mount_dir: /var/share
+
+docker_logging_driver: syslog
+docker_logging_tag:  "{%raw%}docker/{{.Name}}/{{.Name}}{%endraw%}"
+docker_logging_dir: "/var/log/docker"
+docker_syslog_address: udp://127.0.0.1:10514
+
+deploy_user: edox-cicd-s
+deploy_group: root
+

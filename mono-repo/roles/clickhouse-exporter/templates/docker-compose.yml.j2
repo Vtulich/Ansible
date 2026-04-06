@@ -1,0 +1,34 @@
+﻿services:
+  {{ service_name }}:
+    container_name: {{ service_name }}
+    image: edoxauto-docker-local.artifact.firm.ru/{{ service_name }}:{{ service_version }}
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    logging:
+      driver: syslog
+      options:
+        tag: "docker/{{ '{{' }}.Name{{ '}}' }}/{{ '{{' }}.Name{{ '}}' }}"
+    ports:
+      - "14520:8081"
+    environment:
+      - GRPC_DNS_RESOLVER=native
+      - ConsulSettings__ConsulEndpoint=http://consul-agent:8500
+      - ConsulSettings__ConfigPrefix={{ consul_env_path }}/{{ data_center }}
+      - ConsulSettings__ServiceName={{ service_name }}
+      - ConsulSettings__SettingsName=settings.{{ service_config_version }}
+      - ConsulSettings__ServicePrefix={{ consul_env_code }}
+      - ConsulSettings__ServiceIdSuffix={{ target_server_name }}
+      - ConsulSettings__ServiceHost={{ service_name }}
+      - ConsulSettings__HttpPort=14520
+    restart: always
+    volumes:
+      - clickhouse-exporter-storage:/app/storage
+volumes:
+  clickhouse-exporter-storage:
+
+networks:
+  default:
+    external:
+      name: skynet

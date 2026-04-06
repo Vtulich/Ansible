@@ -1,0 +1,5 @@
+﻿- name: Запуск роли
+  hosts: "{{ target_server_name }}"
+  gather_facts: no
+  roles:
+    - clickhouse-exporter

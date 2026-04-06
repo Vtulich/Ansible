@@ -1,0 +1,110 @@
+﻿[all]
+
+[prod_elk]
+msa-edor02-es01.office.firm.ru data_center=msa
+msk-edor02-es02.office.firm.ru data_center=msk
+
+[uat_elk]
+msa-edou01-es01.office.firm.ru data_center=msa
+msk-edou01-es02.office.firm.ru data_center=msk
+
+[hotfix_apps_auto]
+msm-edou01-ap07.office.firm.ru
+
+[uat_fs]
+msa-edou01-fs01.office.firm.ru node=node1
+msk-edou01-fs02.office.firm.ru node=node2
+
+[prod_fs]
+msa-edor02-fs01.office.firm.ru node=node1
+msk-edor02-fs02.office.firm.ru node=node2
+
+[prod_apps_global]
+msk-globr1-ap04.office.firm.ru data_center=msk_new
+msa-globr1-ap03.office.firm.ru data_center=msa_new
+
+[uat_apps_global]
+msa-globu1-ap24.office.firm.ru data_center=msa_new
+msk-globu1-ap25.office.firm.ru data_center=msk_new
+
+[uat_apps_autodeploy]
+msa-edou01-ap11.office.firm.ru data_center=msa_new
+msk-edou01-ap12.office.firm.ru data_center=msk_new
+
+[uat_apps]
+msa-edou01-ap11.office.firm.ru data_center=msa_new app_ip=**
+msk-edou01-ap12.office.firm.ru data_center=msk_new app_ip=**
+msk-edou01-ap14.office.firm.ru data_center=msk_new
+msa-edou01-ap15.office.firm.ru data_center=msa_new
+
+
+
+[uat_apps_auto]
+msa-edou01-ap06.office.firm.ru data_center=msa ansible_python_interpreter=/usr/bin/python3
+msm-edou01-ap07.office.firm.ru data_center=msm ansible_python_interpreter=/usr/bin/python3
+msk-edou01-ap16.office.firm.ru data_center=msk ansible_python_interpreter=/usr/bin/python3
+msa-edou01-ap17.office.firm.ru data_center=msa ansible_python_interpreter=/usr/bin/python3
+msk-edou01-ap24.office.firm.ru data_center=msk ansible_python_interpreter=/usr/bin/python3
+msa-edou01-ap25.office.firm.ru data_center=msa ansible_python_interpreter=/usr/bin/python3
+
+
+
+
+[uat_clickhouse_exporter]
+msa-edou01-ap06.office.firm.ru data_center=msa
+msm-edou01-ap07.office.firm.ru data_center=msm
+msk-edou01-ap16.office.firm.ru data_center=msk
+msa-edou01-ap17.office.firm.ru data_center=msa
+msk-edou01-ap24.office.firm.ru data_center=msk
+msa-edou01-ap25.office.firm.ru data_center=msa
+
+[prod_apps]
+msa-edor02-ap14.office.firm.ru data_center=msa_new
+msk-edor02-ap15.office.firm.ru data_center=msk_new
+msa-edor02-ap11.office.firm.ru data_center=msa_new
+msk-edor02-ap12.office.firm.ru data_center=msk_new
+
+
+[prod_apps_auto]
+msa-smevr4-ap01.office.firm.ru data_center=msa ansible_python_interpreter=/usr/bin/python3
+msa-smevr4-ap02.office.firm.ru data_center=msa ansible_python_interpreter=/usr/bin/python3
+msa-edor02-ap05.office.firm.ru data_center=msa ansible_python_interpreter=/usr/bin/python3
+msm-edor02-ap06.office.firm.ru data_center=msm ansible_python_interpreter=/usr/bin/python3
+msa-edor02-ap09.office.firm.ru data_center=msa ansible_python_interpreter=/usr/bin/python3
+msk-edor02-ap10.office.firm.ru data_center=msk ansible_python_interpreter=/usr/bin/python3
+msa-edor02-ap22.office.firm.ru data_center=msa_new ansible_python_interpreter=/usr/bin/python3
+msk-edor02-ap23.office.firm.ru data_center=msk_new ansible_python_interpreter=/usr/bin/python3
+
+[prod_clickhouse_exporter]
+msa-edor02-ap05.office.firm.ru data_center=msa
+msm-edor02-ap06.office.firm.ru data_center=msm
+
+[application_servers:children]
+uat_apps
+prod_apps
+
+[global_servers:children]
+uat_apps_global
+prod_apps_global
+
+
+[uat_web]
+msa-edou01-wb03.office.firm.ru data_center=msa_new
+msk-edou01-wb05.office.firm.ru data_center=msk_new
+
+[prod_web]
+msa-edor02-wb04.office.firm.ru data_center=msa_new
+msk-edor02-wb05.office.firm.ru data_center=msk_new
+
+[web_servers:children]
+uat_web
+prod_web
+
+[uat_monolith]
+msa-edou01-ap04.office.firm.ru
+msk-edou01-ap05.office.firm.ru
+
+[prod_monolith]
+msa-edor02-ap03.office.firm.ru
+msk-edor02-ap04.office.firm.ru
+

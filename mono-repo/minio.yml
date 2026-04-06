@@ -1,0 +1,5 @@
+﻿- name: Запуск роли minio
+  hosts: "{{ target_group }}"
+  gather_facts: no
+  roles:
+    - minio
