@@ -1,0 +1,10 @@
+# balancer
+balancer_url_hyperdx: "https://hyperdx.firm.ru"
+
+# ingress
+ingress_hostname: "hyperdx.firm.ru"
+
+# vault build сервер
+vault_agent_api_url: "http://127.0.0.1:8104"
+vault_agent_name_directory: "vault_proxy_prod_hyperdx"
+vault_ansible_secret_path: "/project/data/hyperdx/{{ env_code }}/secrets"

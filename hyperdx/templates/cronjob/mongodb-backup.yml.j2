@@ -1,0 +1,71 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: mongo-minio-backup
+spec:
+  schedule: "0 */6 * * *"
+  concurrencyPolicy: Forbid  # Не запускать параллельно
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 3 # сколько раз ретраить Job при неудаче
+      ttlSecondsAfterFinished: 11000 # Время жизни Jobs
+      template:
+        spec:
+          restartPolicy: OnFailure
+          volumes:
+            - name: tools
+              emptyDir: {}
+          initContainers:
+            - name: download-mc
+              image: curlimages/curl:8.7.1
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -e
+                  curl -fsSL https://dl.min.io/client/mc/release/linux-amd64/mc -o /tools/mc
+                  chmod +x /tools/mc
+              volumeMounts:
+                - name: tools
+                  mountPath: /tools
+              resources:
+                limits:
+                  cpu: "200m"
+                  memory: "128Mi"
+
+          containers:
+            - name: mongodump
+              image: mongo:8.2
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -euo pipefail
+                  TMPDIR="$(mktemp -d)"
+                  ARCHIVE="$TMPDIR/hyperdx-$(date +'%Y%m%d-%H%M%S').archive.gz"
+
+                  mongodump \
+                    --uri "${MONGO_URI}&readPreference=secondary" \
+                    --archive="$ARCHIVE" \
+                    --gzip
+
+                  /tools/mc alias set backup "${MINIO_ENDPOINT}" "${MINIO_ACCESS_KEY}" "${MINIO_SECRET_KEY}"
+                  /tools/mc cp "$ARCHIVE" "backup/${MINIO_BUCKET}/"
+
+                  rm -rf "$TMPDIR"
+              env:
+                - name: MONGO_URI
+                  valueFrom:
+                    secretKeyRef:
+                      name: hyperdx-secrets
+                      key: MONGO_URI
+              envFrom:
+                - secretRef:
+                    name: mongo-backup-minio-credentials
+              volumeMounts:
+                - name: tools
+                  mountPath: /tools
+              resources:
+                limits:
+                  cpu: "500m"
+                  memory: "500Mi"

@@ -1,0 +1,80 @@
+- name: Инклюдим переменные из vars
+  ansible.builtin.include_vars:
+    file: "{{ env_code }}.yml"
+
+- name: Импортируем чувствительные переменные из Vault
+  block:
+    - name: Читаем Vault токен
+      become: true
+      slurp:
+        src: "/opt/{{ vault_agent_name_directory }}/.token_unwrapped"
+      register: vault_token
+
+    - name: Получаем секреты из Vault
+      set_fact:
+        vault_secrets: "{{ lookup('community.hashi_vault.hashi_vault',
+                                  vault_ansible_secret_path,
+                                  url=vault_agent_api_url,
+                                  token=(vault_token.content | b64decode)) }}"
+  delegate_to: localhost
+
+- name: Deploy Secrets
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ vault_secrets.connectionk8s | from_yaml }}"
+    namespace: "{{ namespace }}"
+    template: "{{ item }}"
+  loop: "{{ query('fileglob', playbook_dir + '/templates/secrets/*.yml.j2') }}"
+
+- name: Deploy ConfigMap
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ vault_secrets.connectionk8s | from_yaml }}"
+    namespace: "{{ namespace }}"
+    template: "{{ item }}"
+  loop: "{{ query('fileglob', playbook_dir + '/templates/configmap/*.yml.j2') }}"
+
+- name: Deploy Service
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ vault_secrets.connectionk8s | from_yaml }}"
+    namespace: "{{ namespace }}"
+    template: "{{ item }}"
+  loop: "{{ query('fileglob', playbook_dir + '/templates/service/*.yml.j2') }}"
+
+- name: Deploy ingress
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ vault_secrets.connectionk8s | from_yaml }}"
+    namespace: "{{ namespace }}"
+    template: ./templates/ingress/hyperdx.yml.j2
+
+- name: Deploy CronJobs
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ vault_secrets.connectionk8s | from_yaml }}"
+    namespace: "{{ namespace }}"
+    template: "{{ item }}"
+  loop: "{{ query('fileglob', playbook_dir + '/templates/cronjob/*.yml.j2') }}"
+
+- name: Deploy DisruptionBudget
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ vault_secrets.connectionk8s | from_yaml }}"
+    namespace: "{{ namespace }}"
+    template: "{{ item }}"
+  loop: "{{ query('fileglob', playbook_dir + '/templates/disruptionbudget/*.yml.j2') }}"
+
+- name: Deploy Statefulset
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ vault_secrets.connectionk8s | from_yaml }}"
+    namespace: "{{ namespace }}"
+    template: ./templates/statefulset/mongodb.yml.j2
+
+- name: Deploy Deployment
+  kubernetes.core.k8s:
+    state: present
+    kubeconfig: "{{ vault_secrets.connectionk8s | from_yaml }}"
+    namespace: "{{ namespace }}"
+    template: ./templates/deployment/hyperdx.yml.j2

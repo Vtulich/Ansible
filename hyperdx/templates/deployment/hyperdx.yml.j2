@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hyperdx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: hyperdx
+  template:
+    metadata:
+      labels:
+        app: hyperdx
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values: ["hyperdx"]
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: hyperdx
+          image: hyperdx/hyperdx:2.23.0
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: hyperdx-config
+          env:
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef:
+                  name: hyperdx-secrets
+                  key: MONGO_URI
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: hyperdx-secrets
+                  key: JWT_SECRET
+            - name: NEXTAUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: hyperdx-secrets
+                  key: NEXTAUTH_SECRET
+            - name: AUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: hyperdx-secrets
+                  key: AUTH_SECRET
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: hyperdx-secrets
+                  key: ENCRYPTION_KEY
+          ports:
+            - name: http
+              containerPort: 8080
+          resources:
+            limits:
+              cpu: "2.5"
+              memory: 1.5Gi

@@ -1,0 +1,77 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: mongo-minio-restore
+spec:
+  suspend: true
+  schedule: "0 0 * * *"
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          restartPolicy: Never
+          volumes:
+            - name: tools
+              emptyDir: {}
+            - name: workdir
+              emptyDir: {}
+
+          initContainers:
+            - name: download-mc
+              image: curlimages/curl:8.7.1
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -e
+                  curl -fsSL https://dl.min.io/client/mc/release/linux-amd64/mc -o /tools/mc
+                  chmod +x /tools/mc
+              volumeMounts:
+                - name: tools
+                  mountPath: /tools
+              resources:
+                limits:
+                  cpu: "200m"
+                  memory: "128Mi"
+
+          containers:
+            - name: restore
+              image: mongo:8.2
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -euo pipefail
+
+                  /tools/mc alias set backup "${MINIO_ENDPOINT}" "${MINIO_ACCESS_KEY}" "${MINIO_SECRET_KEY}"
+
+                  /tools/mc cp \
+                    "backup/${MINIO_BUCKET}/${BACKUP_FILE}" \
+                    /work/backup.archive.gz
+
+                  mongorestore \
+                    --uri "${MONGO_URI}" \
+                    --archive="/work/backup.archive.gz" \
+                    --gzip \
+                    --drop
+              env:
+                - name: BACKUP_FILE
+                  value: "hyperdx-*.archive.gz"
+                - name: MONGO_URI
+                  valueFrom:
+                    secretKeyRef:
+                      name: hyperdx-secrets
+                      key: MONGO_URI
+              envFrom:
+                - secretRef:
+                    name: mongo-backup-minio-credentials
+              volumeMounts:
+                - name: tools
+                  mountPath: /tools
+                - name: workdir
+                  mountPath: /work
+              resources:
+                limits:
+                  cpu: "500m"
+                  memory: "500Mi"

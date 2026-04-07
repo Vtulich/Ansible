@@ -1,0 +1,86 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongo-scripts
+data:
+  entrypoint.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    KEYFILE_SRC=/secret/keyfile
+    KEYFILE_DST=/workdir/keyfile
+    HOST_SUFFIX="${MONGO_HOST_SUFFIX:-.mongo-headless.{{ namespace }}.svc.cluster.local:27017}"
+
+    log() {
+      printf '[mongo] %s\n' "$1"
+    }
+
+    prepare_keyfile() {
+      install -o 999 -g 999 -m 0400 "${KEYFILE_SRC}" "${KEYFILE_DST}"
+    }
+
+    start_mongod() {
+      log "Starting mongod..."
+      /usr/local/bin/docker-entrypoint.sh mongod \
+        --bind_ip_all \
+        --replSet rs0 \
+        --auth \
+        --keyFile "${KEYFILE_DST}" \
+        --dbpath /data/db &
+      MONGOD_PID=$!
+    }
+
+    mongo_admin_cmd() {
+      mongosh --quiet --host localhost \
+        --authenticationDatabase admin \
+        -u "${MONGO_INITDB_ROOT_USERNAME}" \
+        -p "${MONGO_INITDB_ROOT_PASSWORD}" "$@"
+    }
+
+    wait_ready() {
+      log "Waiting for mongod readiness..."
+      until mongo_admin_cmd --eval 'db.runCommand({ ping: 1 })' >/dev/null 2>&1; do
+        sleep 2
+      done
+    }
+
+    init_replica_set() {
+      if [[ "$(hostname)" != "mongo-0" ]]; then
+        log "Non-primary pod — skipping rs.initiate."
+        return
+      fi
+
+      log "Initializing replica set (if needed)..."
+      mongo_admin_cmd <<EOF
+    try {
+      const status = rs.status();
+      if (status.ok === 1) {
+        print("Replica set already initialized.");
+      }
+    } catch (err) {
+      if (err.code === 94) {
+        rs.initiate({
+          _id: "rs0",
+          members: [
+            { _id: 0, host: "mongo-0${HOST_SUFFIX}" },
+            { _id: 1, host: "mongo-1${HOST_SUFFIX}" },
+            { _id: 2, host: "mongo-2${HOST_SUFFIX}" }
+          ]
+        });
+      } else {
+        print("Unexpected error: " + tojson(err));
+        quit(1);
+      }
+    }
+    EOF
+    }
+
+    main() {
+      prepare_keyfile
+      start_mongod
+      wait_ready
+      init_replica_set
+      wait "${MONGOD_PID}"
+    }
+
+    main

@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo
+spec:
+  serviceName: mongo-headless
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mongo
+  template:
+    metadata:
+      labels:
+        app: mongo
+    spec:
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+        fsGroup: 0
+      volumes:
+        - name: mongo-keyfile-src
+          secret:
+            secretName: mongo-keyfile
+            defaultMode: 0400
+        - name: mongo-keyfile-workdir
+          emptyDir: {}
+        - name: mongo-scripts
+          configMap:
+            name: mongo-scripts
+            defaultMode: 0755
+      containers:
+        - name: mongo
+          image: mongo:8.2
+          imagePullPolicy: IfNotPresent
+          command: ["/scripts/entrypoint.sh"]
+          ports:
+            - name: mongodb
+              containerPort: 27017
+          resources:
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-root-credentials
+                  key: username
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-root-credentials
+                  key: password
+            - name: MONGO_HOST_SUFFIX
+              value: ".mongo-headless.{{ namespace }}.svc.cluster.local:27017"
+          volumeMounts:
+            - name: data
+              mountPath: /data/db
+            - name: mongo-keyfile-src
+              mountPath: /secret
+              readOnly: true
+            - name: mongo-keyfile-workdir
+              mountPath: /workdir
+            - name: mongo-scripts
+              mountPath: /scripts
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: longhorn
+        resources:
+          requests:
+            storage: 20Gi

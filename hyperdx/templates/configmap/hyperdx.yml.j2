@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hyperdx-config
+data:
+  FRONTEND_URL:  "{{ balancer_url_hyperdx }}"
+  HYPERDX_APP_URL: "{{ balancer_url_hyperdx }}"
+  PUBLIC_URL: "{{ balancer_url_hyperdx }}"
+  NEXTAUTH_URL: "{{ balancer_url_hyperdx }}"
+  AUTH_URL: "{{ balancer_url_hyperdx }}"
+  HYPERDX_APP_PORT: "8080"
+  DISABLE_TELEMETRY: "true"
+  OTEL_TRACES_EXPORTER: "none"
+  OTEL_METRICS_EXPORTER: "none"
+  USAGE_STATS_ENABLED: "false"
